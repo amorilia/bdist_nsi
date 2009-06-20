@@ -70,16 +70,29 @@ class bdist_nsi(Command):
                         "target version can only be" + short_version
             self.target_version = short_version
         if self.nsis_dir is None:
-            self.nsis_dir=""
             pathlist = os.environ.get('PATH', os.defpath).split(os.pathsep)
             # common locations
             pathlist.extend([
+                ".",
                 "C:\\Program Files\\NSIS",
                 "C:\\Program Files (x86)\\NSIS"])
-            for path in pathlist:
-                if os.access(os.path.join(path, "makensis.exe"), os.X_OK):
-                    self.nsis_dir = path
-                    break
+        else:
+            pathlist = [self.nsis_dir]
+        for path in pathlist:
+            makensis = os.path.join(path, "makensis.exe")
+            if os.access(makensis, os.X_OK):
+                self.nsis_dir = makensis
+                break
+            makensis = os.path.join(path, "makensis")
+            if os.access(makensis, os.X_OK):
+                self.nsis_dir = makensis
+                break
+        else:
+            print(
+                "Error: makensis executable not found, "
+                "add NSIS directory to the path or specify it "
+                "with --nsis-dir")
+            self.nsis_dir = None
         self.set_undefined_options('bdist',
                                    ('dist_dir', 'dist_dir'),
                                    ('nsis_dir', 'nsis_dir'))
@@ -234,13 +247,15 @@ class bdist_nsi(Command):
                 arg.append([os.path.dirname(f),f])
                 
     def compile(self):
-        # create destination directory
-        # (nsis complains if it does not yet exist)
-        self.mkpath(self.dist_dir)
-        try:
-            spawn([os.path.join(self.nsis_dir,'makensis.exe'),os.path.join(self.bdist_dir,'setup.nsi')])
-        except:
-            print "Error: makensis executable not found, add NSIS directory to the path or specify it with --nsis-dir"                
+        if self.nsis_dir is not None:
+            # create destination directory
+            # (nsis complains if it does not yet exist)
+            self.mkpath(self.dist_dir)
+            try:
+                spawn([os.path.join(self.nsis_dir),
+                       os.path.join(self.bdist_dir, 'setup.nsi')])
+            except:
+                print("Warning: possible error during NSIS compilation.")
 
             
 # class bdist_nsi
