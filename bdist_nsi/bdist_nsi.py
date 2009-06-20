@@ -143,9 +143,8 @@ class bdist_nsi(Command):
             licfile.write(lic)
             licfile.close()
                 
+        # dist dir relative to the build dir
         distdir=os.path.join('..','..','..',self.dist_dir)
-        if not os.path.exists(distdir):
-            os.makedirs(distdir)
             
         if self.target_version:
             installer_path = os.path.join(distdir, "%s.win32-py%s.exe" % (self.distribution.get_fullname(), self.target_version))
