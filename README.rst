@@ -17,3 +17,9 @@ Usage
 Create your installer with::
 
     python setup.py --command-packages bdist_nsi bdist_nsi --nsis-dir="C:\Program Files (x86)\NSIS"
+
+Acknowledgements
+================
+
+This project effectively builds further on j-cg's bdist-nsi project,
+http://bdist-nsi.sourceforge.net/

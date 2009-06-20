@@ -21,7 +21,9 @@ setup(
     packages = ['bdist_nsi'],
     version = '0.1.0',
     description = 'Create an NSIS windows installer.',
-    author = 'j-cg, amorilia',
+    # note: author of the original http://bdist-nsi.sourceforge.net/ package
+    #       (which formed the original basis of bdist_nsi) is j-cg
+    author = 'Amorilia',
     author_email = 'amorilia@users.sourceforge.net',
     url = 'http://github.com/amorilia/bdist_nsi',
     license = 'BSD',
