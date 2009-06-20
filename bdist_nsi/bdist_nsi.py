@@ -1,6 +1,6 @@
-"""bdist_nsi
+"""bdist_nsi.bdist_nsi
 
-Implements the distutils bdist_nsi command: create a Windows NSIS installer.
+Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 """
 
 # Created 2005/05/24, j-cg , inspired by the bdist_wininst of the python
@@ -17,29 +17,29 @@ from distutils.spawn import spawn
 
 class bdist_nsi(Command):
 
-    description = "create an executable installer for MS Windows"
+    description = "create an executable installer for MS Windows, using NSIS"
 
     user_options = [('bdist-dir=', None,
-                        "temporary directory for creating the distribution"),
+                    "temporary directory for creating the distribution"),
                     ('keep-temp', 'k',
-                        "keep the pseudo-installation tree around after " +
-                        "creating the distribution archive"),
+                     "keep the pseudo-installation tree around after " +
+                     "creating the distribution archive"),
                     ('target-version=', 'v',
-                        "require a specific python version" +
-                        " on the target system"),
+                     "require a specific python version" +
+                     " on the target system"),
                     ('no-target-compile', 'c',
-                        "do not compile .py to .pyc on the target system"),
+                     "do not compile .py to .pyc on the target system"),
                     ('no-target-optimize', 'o',
-                        "do not compile .py to .pyo (optimized)"
-                        "on the target system"),
+                     "do not compile .py to .pyo (optimized)"
+                     "on the target system"),
                     ('dist-dir=', 'd',
-                        "directory to put final built distributions in"),
+                     "directory to put final built distributions in"),
                     ('nsis-dir=', 'n',
-                        "directory of nsis compiler"),
+                     "directory of nsis compiler"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
-                        'skip-build']
+                       'skip-build']
 
     def initialize_options (self):
         self.bdist_dir = None
@@ -71,7 +71,9 @@ class bdist_nsi(Command):
             self.target_version = short_version
         if self.nsis_dir is None:
             self.nsis_dir=""
-        self.set_undefined_options('bdist', ('dist_dir', 'dist_dir'),('nsis_dir', 'nsis_dir'))
+        self.set_undefined_options('bdist',
+                                   ('dist_dir', 'dist_dir'),
+                                   ('nsis_dir', 'nsis_dir'))
 
     # finalize_options()
 
@@ -224,13 +226,14 @@ class bdist_nsi(Command):
                 arg.append([os.path.dirname(f),f])
                 
     def compile(self):
+        # create destination directory
+        # (nsis complains if it does not yet exist)
+        self.mkpath(self.dist_dir)
         try:
             spawn([os.path.join(self.nsis_dir,'makensis.exe'),os.path.join(self.bdist_dir,'setup.nsi')])
         except:
-            print "Error: makensis executable not found, add NSIS directory to the path or specify it with --nsis-dir"
-            
-                
-                      
+            print "Error: makensis executable not found, add NSIS directory to the path or specify it with --nsis-dir"                
+
             
 # class bdist_nsi
 
