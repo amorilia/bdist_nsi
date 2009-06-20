@@ -1,11 +1,12 @@
-"""distutils.command.bdist_nsi
+"""bdist_nsi
 
-Implements the Distutils 'bdist_nsi' command: create a windows installer
-exe-program."""
+Implements the distutils bdist_nsi command: create a Windows NSIS installer.
+"""
 
-# created 2005/05/24, j-cg , inspired by the bdist_wininst of the python distribution
+# Created 2005/05/24, j-cg , inspired by the bdist_wininst of the python
+# distribution
 
-#these are the first pre-alpha releases for testing purpose only..
+# June 2009: further developed by Amorilia
 
 import sys, os, string, zlib, base64
 from distutils.core import Command
@@ -14,7 +15,7 @@ from distutils.dir_util import create_tree, remove_tree
 from distutils.errors import *
 from distutils.spawn import spawn
 
-class bdist_nsi (Command):
+class bdist_nsi(Command):
 
     description = "create an executable installer for MS Windows"
 

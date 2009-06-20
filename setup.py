@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Setup script for bdist-nsi."""
+"""Setup script for bdist_nsi."""
 
 classifiers = """Development Status :: 2 - Pre-Alpha
 Intended Audience :: Developers
@@ -17,15 +17,15 @@ import os
 long_description = open("README.rst").read()
 
 setup(
-    name = 'bdist-nsi',
+    name = 'bdist_nsi',
+    py_modules = ['bdist_nsi'],
     version = '0.1.0',
     description = 'Create an NSIS windows installer.',
     author = 'j-cg, amorilia',
     author_email = 'amorilia@users.sourceforge.net',
-    url = 'http://github.com/amorilia/bdist-nsi',
+    url = 'http://github.com/amorilia/bdist_nsi',
     license = 'BSD',
     platforms = ["any"],
     classifiers = filter(None, classifiers.split("\n")),
-    long_description = long_description,
-    data_files = [['distutils/command',['bdist_nsi.py']]]
+    long_description = long_description
 )

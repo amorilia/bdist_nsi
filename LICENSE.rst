@@ -1,4 +1,4 @@
-Copyright © 2009, bdist-nsi contributors
+Copyright © 2009, bdist_nsi contributors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -13,7 +13,7 @@ are met:
      disclaimer in the documentation and/or other materials provided
      with the distribution.
 
-   * Neither the name of the bdist-nsi project nor the names of its
+   * Neither the name of the bdist_nsi project nor the names of its
      contributors may be used to endorse or promote products derived
 	 from this software without specific prior written permission.
 
