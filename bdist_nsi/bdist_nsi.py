@@ -276,6 +276,8 @@ byte_compile(g, optimize=1, force=None,
 """
 
 NSIDATA="""\
+SetCompressor /SOLID lzma
+
 !define PRODUCT_NAME "@name@"
 !define PRODUCT_VERSION "@version@"
 !define PRODUCT_PUBLISHER "@author@ <@author_email@>"
