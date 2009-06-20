@@ -16,7 +16,12 @@ Usage
 
 Create your installer with::
 
-    python setup.py --command-packages bdist_nsi bdist_nsi --nsis-dir="C:\Program Files (x86)\NSIS"
+    python setup.py --command-packages bdist_nsi bdist_nsi
+
+If the makensis executable is not installed in one of the usual
+locations (``/usr/bin``, ``C:\\Program Files\\NSIS``, or
+``C:\\Program Files (x86)\\NSIS``), then you can specify the
+NSIS folder with the *--nsis-dir* option.
 
 Acknowledgements
 ================
