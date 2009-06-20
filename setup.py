@@ -18,7 +18,7 @@ long_description = open("README.rst").read()
 
 setup(
     name = 'bdist_nsi',
-    py_modules = ['bdist_nsi'],
+    packages = ['bdist_nsi'],
     version = '0.1.0',
     description = 'Create an NSIS windows installer.',
     author = 'j-cg, amorilia',
