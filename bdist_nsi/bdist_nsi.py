@@ -178,12 +178,7 @@ class bdist_nsi(Command):
         b=zlib.decompress(base64.decodestring(HEADER_BITMAP))
         headerbitmapfile.write(b)
         headerbitmapfile.close()
-        
-        setupicofile=open(os.path.join(self.bdist_dir,'setup.ico'),'wb')
-        b=zlib.decompress(base64.decodestring(SETUP_ICO))
-        setupicofile.write(b)
-        setupicofile.close()
-        
+                
         wizardbitmapfile=open(os.path.join(self.bdist_dir,'wizard.bmp'),'wb')
         b=zlib.decompress(base64.decodestring(WIZARD_BITMAP))
         wizardbitmapfile.write(b)
@@ -232,6 +227,15 @@ class bdist_nsi(Command):
             nsiscript=nsiscript.replace('@optimize@','')
         else:
             nsiscript=nsiscript.replace('@optimize@',';')   
+
+        # icon files
+        # XXX todo: make icons configurable
+        nsiscript = nsiscript.replace(
+            "@ico_install@",
+            os.path.join(os.path.dirname(__file__), "python.ico"))
+        nsiscript = nsiscript.replace(
+            "@ico_uninstall@",
+            os.path.join(os.path.dirname(__file__), "python.ico"))
 
         nsifile=open(os.path.join(self.bdist_dir,'setup.nsi'),'wt')
         nsifile.write(nsiscript)
@@ -297,8 +301,8 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_DEFAULT MUI_WELCOMEFINISHPAGE_BITMAP "wizard.bmp"
 !define MUI_HEADERIMAGE
 !define MUI_ABORTWARNING
-!define MUI_ICON "setup.ico"
-!define MUI_UNICON "setup.ico"
+!define MUI_ICON "@ico_install@"
+!define MUI_UNICON "@ico_uninstall@"
 
 ; Language Selection Dialog Settings
 !define MUI_LANGDLL_REGISTRY_ROOT "${PRODUCT_UNINST_ROOT_KEY}"
@@ -539,64 +543,6 @@ OzbhE09wcVW0tLbiH13JQhQ2qbmOhbyUqJlHrnbbotiET5zDwRVdobGUFSpW/WH1klcTE3m1tUZ8
 /WHUV1s7ZJZLY+lw6Kx4WtbXN2D25BcSTHNZFJvwiSe4uKJVlj5e/Na6+A0bpHKFopXBsjAGOKkX
 m1gWT+hw6cYTUnm/l4c4qt4+blS/5XvC2MSyeIJwGYknVK8fjXJZHAPoxRPmfRnlWhfLm4tHDGA+
 nmjUOUZb4MvMW3e+vvjEE7x88f8uBdO+2te9ri+OeIKLq6PfpbDbXDxxyVg8UVevz9UK/A8SQPCr
-
-"""
-SETUP_ICO="""\
-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
-C9l/AGrOZTg=
 """
 
 WIZARD_BITMAP="""\

@@ -19,8 +19,9 @@ long_description = open("README.rst").read()
 setup(
     name = 'bdist_nsi',
     packages = ['bdist_nsi'],
+    package_data = {'': ['*.ico']}, # include ico files
     version = '0.1.0',
-    description = 'Create an NSIS windows installer.',
+    description = 'Create NSIS windows installers for Python modules.',
     # note: author of the original http://bdist-nsi.sourceforge.net/ package
     #       (which formed the original basis of bdist_nsi) is j-cg
     author = 'Amorilia',
