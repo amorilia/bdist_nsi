@@ -137,7 +137,7 @@ class bdist_nsi(Command):
 
     
     def build_nsi(self):
-        nsiscript = NSIDATA
+        nsiscript = get_nsi()
         metadata = self.distribution.metadata
         lic=""
         for name in ["author", "author_email", "maintainer",
@@ -184,17 +184,17 @@ class bdist_nsi(Command):
         lastdir=""
         for each in files:
             if lastdir != each[0]:
-                _f.append('  SetOutPath "$INSTDIR\%s"\n' % each[0])
+                _f.append('  SetOutPath "$0\%s"\n' % each[0])
                 lastdir=each[0]
                 if each[0] not in ['Lib\\site-packages','Scripts','Include','']:
-                    _d.insert(0,'    RMDir "$INSTDIR\\'+each[0]+'\"\n')
+                    _d.insert(0,'    RMDir "$0\\'+each[0]+'\"\n')
             _f.append('  File "_python\\'+each[1]+'\"\n')
             
             if (each[1][len(each[1])-3:].lower() == ".py"):
                 _fc.append('"'+each[1]+'",\n')
-                _fd.append('    Delete "$INSTDIR\\'+each[1]+'o'+'\"\n')
-                _fd.append('    Delete "$INSTDIR\\'+each[1]+'c'+'\"\n')
-            _fd.append('    Delete "$INSTDIR\\'+each[1]+'\"\n')
+                _fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
+                _fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
+            _fd.append('    Delete "$0\\'+each[1]+'\"\n')
         nsiscript=nsiscript.replace('@_files@',''.join(_f))
         nsiscript=nsiscript.replace('@_deletefiles@',''.join(_fd))
         nsiscript=nsiscript.replace('@_deletedirs@',''.join(_d))
@@ -274,12 +274,67 @@ byte_compile(g, optimize=1, force=None,
                     direct=1)
 """
 
-NSIDATA="""\
-; @name@ self-installer for windows
+def get_nsi(pythonversions=[
+    "2.3", "2.4", "2.5", "2.6", "2.7" #, "3.0", "3.1"
+    ]):
+    # python sepecific functions and sections in the nsi file
+    NSI_PYTHON = """
+
+; Install the library for Python @pythonversion@
+Section "${PRODUCT_NAME} for Python @pythonversion@" Python@pythonversion@
+    SetShellVarContext all
+
+    ; get python directory and validate
+    ReadRegStr $0 HKLM "SOFTWARE\Python\PythonCore\@pythonversion@\InstallPath" ""
+    IfErrors 0 +2
+
+        Abort "Python @pythonversion@ not found."
+
+    SetOutPath $0
+@_files@
+
+;    !ifdef MISC_COMPILE
+;    SetOutPath "$0\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
+;    File "bytecompil.py"
+;    nsExec::Exec '$0\python.exe $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
+;    !endif
+;    !ifdef MISC_OPTIMIZE
+;    SetOutPath "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
+;    File "bytecompil.py"
+;    nsExec::Exec '$0\python.exe -OO $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
+;    !endif
+;    RMDir /r "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
+;    RMDir "$TEMP\_python"
+SectionEnd
+
+; Check for valid Python @pythonversion@ installation
+Function CheckPython@pythonversion@
+    Push $0
+    ClearErrors
+    ReadRegStr $0 HKLM "SOFTWARE\Python\PythonCore\@pythonversion@\InstallPath" ""
+    IfErrors 0 +2
+
+      ; python @pythonversion@ not found, so disable that section
+      SectionSetFlags ${Python@pythonversion@} ${SF_RO}
+
+    IfFileExists $0\python.exe +2 0
+
+      ; python.exe not found (python manually deleted?), so disable the section
+      SectionSetFlags ${Python@pythonversion@} ${SF_RO}
+
+    Pop $0
+FunctionEnd
+"""
+
+    NSI_HEADER = """\
+; @name@ self-installer for Windows
 ; (@name@ - @url@)
 ; (NSIS - http://nsis.sourceforge.net)
 
-SetCompressor /SOLID lzma
+
+
+; Define Application Specific Constants
+; =====================================
 
 !define PRODUCT_NAME "@name@"
 !define PRODUCT_VERSION "@version@"
@@ -288,198 +343,109 @@ SetCompressor /SOLID lzma
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 !define PRODUCT_STARTMENU_REGVAL "NSIS:StartMenuDir"
-@haspythonversion@!define PRODUCT_PYTHONVERSION "@pythonversion@"
 @compile@!define MISC_COMPILE "1"
 @optimize@!define MISC_OPTIMIZE "1"
 
-; MUI 1.67 compatible ------
-!include "MUI.nsh"
 
-; MUI Settings
-!insertmacro MUI_DEFAULT MUI_HEADERIMAGE_BITMAP "@header_bitmap@"
-!insertmacro MUI_DEFAULT MUI_WELCOMEFINISHPAGE_BITMAP "@welcome_bitmap@"
-!define MUI_HEADERIMAGE
-!define MUI_ABORTWARNING
-!define MUI_ICON "@ico_install@"
-!define MUI_UNICON "@ico_uninstall@"
 
-; Language Selection Dialog Settings
-!define MUI_LANGDLL_REGISTRY_ROOT "${PRODUCT_UNINST_ROOT_KEY}"
-!define MUI_LANGDLL_REGISTRY_KEY "${PRODUCT_UNINST_KEY}"
-!define MUI_LANGDLL_REGISTRY_VALUENAME "NSIS:Language"
+; Various Settings
+; ================
 
-; Welcome page
-!insertmacro MUI_PAGE_WELCOME
-; License page
-!insertmacro MUI_PAGE_LICENSE "license"
-; Components page
-;!insertmacro MUI_PAGE_COMPONENTS
-; Directory page
-!insertmacro MUI_PAGE_DIRECTORY
-; Start menu page
-
-!define MUI_STARTMENUPAGE_NODISABLE
-!define MUI_STARTMENUPAGE_DEFAULTFOLDER ""
-!define MUI_STARTMENUPAGE_REGISTRY_ROOT "${PRODUCT_UNINST_ROOT_KEY}"
-!define MUI_STARTMENUPAGE_REGISTRY_KEY "${PRODUCT_UNINST_KEY}"
-!define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "${PRODUCT_STARTMENU_REGVAL}"
-; Instfiles page
-!insertmacro MUI_PAGE_INSTFILES
-; Finish page
-!insertmacro MUI_PAGE_FINISH
-
-; Uninstaller pages
-!insertmacro MUI_UNPAGE_INSTFILES
-
-; Language files
-    !insertmacro MUI_LANGUAGE "English"
-    !insertmacro MUI_LANGUAGE "French"
-    !insertmacro MUI_LANGUAGE "German"
-    !insertmacro MUI_LANGUAGE "Spanish"
-    !insertmacro MUI_LANGUAGE "SimpChinese"
-    !insertmacro MUI_LANGUAGE "TradChinese"
-    !insertmacro MUI_LANGUAGE "Japanese"
-    !insertmacro MUI_LANGUAGE "Korean"
-    !insertmacro MUI_LANGUAGE "Italian"
-    !insertmacro MUI_LANGUAGE "Dutch"
-    !insertmacro MUI_LANGUAGE "Danish"
-    !insertmacro MUI_LANGUAGE "Swedish"
-    !insertmacro MUI_LANGUAGE "Norwegian"
-    !insertmacro MUI_LANGUAGE "Finnish"
-    !insertmacro MUI_LANGUAGE "Greek"
-    !insertmacro MUI_LANGUAGE "Russian"
-    !insertmacro MUI_LANGUAGE "Portuguese"
-    !insertmacro MUI_LANGUAGE "PortugueseBR"
-    !insertmacro MUI_LANGUAGE "Polish"
-    !insertmacro MUI_LANGUAGE "Ukrainian"
-    !insertmacro MUI_LANGUAGE "Czech"
-    !insertmacro MUI_LANGUAGE "Slovak"
-    !insertmacro MUI_LANGUAGE "Croatian"
-    !insertmacro MUI_LANGUAGE "Bulgarian"
-    !insertmacro MUI_LANGUAGE "Hungarian"
-    !insertmacro MUI_LANGUAGE "Thai"
-    !insertmacro MUI_LANGUAGE "Romanian"
-    !insertmacro MUI_LANGUAGE "Latvian"
-    !insertmacro MUI_LANGUAGE "Macedonian"
-    !insertmacro MUI_LANGUAGE "Estonian"
-    !insertmacro MUI_LANGUAGE "Turkish"
-    !insertmacro MUI_LANGUAGE "Lithuanian"
-    !insertmacro MUI_LANGUAGE "Catalan"
-    !insertmacro MUI_LANGUAGE "Slovenian"
-    !insertmacro MUI_LANGUAGE "Serbian"
-    !insertmacro MUI_LANGUAGE "SerbianLatin"
-    !insertmacro MUI_LANGUAGE "Arabic"
-    !insertmacro MUI_LANGUAGE "Farsi"
-    !insertmacro MUI_LANGUAGE "Hebrew"
-    !insertmacro MUI_LANGUAGE "Indonesian"
-
-; MUI end ------
-
+; solid lzma gives best compression in virtually all cases
+SetCompressor /SOLID lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "@installer_path@"
-
-
-InstallDir "C:\Python"
-InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
 ShowUnInstDetails show
 
 
 
+; Includes
+; ========
+
+!include "MUI2.nsh"
+
+
+
+; MUI Settings
+; ============
+
+!define MUI_ABORTWARNING
+!define MUI_FINISHPAGE_NOAUTOCLOSE
+!define MUI_UNFINISHPAGE_NOAUTOCLOSE
+
+!define MUI_ICON "@ico_install@"
+!define MUI_UNICON "@ico_uninstall@"
+
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_BITMAP "@header_bitmap@"
+!define MUI_HEADERIMAGE_UNBITMAP "@header_bitmap@"
+
+!define MUI_WELCOMEFINISHPAGE_BITMAP "@welcome_bitmap@"
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "@welcome_bitmap@"
+
+!define MUI_WELCOMEPAGE_TEXT  "This wizard will guide you through the installation of ${PRODUCT_NAME} ${PRODUCT_VERSION}.$\\r$\\n$\\r$\\nIt is recommended that you close all other applications, especially any applications that might use Python.$\\r$\\n$\\r$\\nNote to Win2k/XP/Vista users: you require administrator privileges to install ${PRODUCT_NAME} successfully."
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "license" ; XXX fix license file name
+!insertmacro MUI_PAGE_COMPONENTS
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!define MUI_WELCOMEPAGE_TEXT  "This wizard will guide you through the uninstallation of ${PRODUCT_NAME} ${PRODUCT_VERSION}.$\\r$\\n$\\r$\\nBefore starting the uninstallation, make sure ${PRODUCT_NAME} is not running.$\\r$\\n$\\r$\\nClick Next to continue."
+!insertmacro MUI_UNPAGE_WELCOME
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
+
+!insertmacro MUI_LANGUAGE "English"
+
+!define MUI_COMPONENTSPAGE_NODESC
+
+"""
+
+    NSI_FOOTER = """
+; Functions
+; =========
+
 Function .onInit
-    !insertmacro MUI_LANGDLL_DISPLAY
-    Call CheckPython
-FunctionEnd
+  MessageBox MB_YESNO|MB_ICONEXCLAMATION "Installer is experimental and is likely to fail. Continue?" IDYES +2
 
-!ifdef PRODUCT_PYTHONVERSION
-Function GetSpecificPythonPath
-    Push $R0
-    ClearErrors
-    ReadRegStr $R0 HKLM "SOFTWARE\Python\PythonCore\${PRODUCT_PYTHONVERSION}\InstallPath" ""
-    IfErrors lbl_na
-    Goto lbl_end
-    lbl_na:
-    StrCpy $R0 ""
-    lbl_end:
-    Exch $R0
-FunctionEnd
-!else
-Function GetPythonPath
-    Push $R0
-    Push $0
-    Push $1
-    StrCpy $0 0
-    ClearErrors
-    loop:
-    EnumRegKey $R0 HKLM "SOFTWARE\Python\PythonCore" $0
-    StrCmp $R0 "" lbl_end
-    ReadRegStr $1 HKLM "SOFTWARE\Python\PythonCore\$R0\InstallPath" ""    
-    StrCmp $1 "" lbl_end
-    StrCpy $INSTDIR $1
-    IntOp $0 $0 + 1
-    Goto loop
-    lbl_end:
-    Pop $1
-    Pop $0
-    Pop $R0
-FunctionEnd
-!endif
+    Abort ; quit installer
 
+  ; Check if user is admin.
+  ; Call userInfo plugin to get user info.
+  ; The plugin puts the result in the stack.
+  userInfo::getAccountType
 
-Section "main" SEC01
-    SectionIn 1 32 RO
-    SetOverwrite ifnewer
-    SetOutPath $INSTDIR
-@_files@
-    
-    
+  ; pop the result from the stack into $0
+  pop $0
 
-    !ifdef MISC_COMPILE
-    SetOutPath "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-    File "bytecompil.py"
-    nsExec::Exec '$INSTDIR\python.exe $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
-    !endif
-    !ifdef MISC_OPTIMIZE
-    SetOutPath "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-    File "bytecompil.py"
-    nsExec::Exec '$INSTDIR\python.exe -OO $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
-    !endif
-    RMDir /r "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-    RMDir "$TEMP\_python"
-    
-SectionEnd
+  ; Compare the result with the string "Admin" to see if the user is admin.
+  ; If match, jump 3 lines down.
+  strCmp $0 "Admin" +3
+  
+    ; if there is not a match, print message and return
+    messageBox MB_OK|MB_ICONEXCLAMATION "You require administrator privileges to install ColladaCGF successfully."
+    Abort ; quit installer
 
-Function CheckPython
-    !ifdef PRODUCT_PYTHONVERSION
-    Push $9
-    Call GetSpecificPythonPath
-    Pop $9
-    StrCmp $9 "" lbl_err lbl_ok
-lbl_err:
-    MessageBox MB_OK "Python ${PRODUCT_PYTHONVERSION} not found. Install it first."
-    Abort
-lbl_ok:
-    StrCpy $INSTDIR $9
-    !else
-    Call GetPythonPath
-    !endif
-FunctionEnd
+  ; select language
+  !insertmacro MUI_LANGDLL_DISPLAY
 
-Function .onVerifyInstDir
-    IfFileExists $INSTDIR\python.exe goodpath
-        Abort 
-    goodpath:
+  ; check python versions
+""" + "\n".join("  call CheckPython%s" % pythonversion
+                 for pythonversion in pythonversions) + """
 FunctionEnd
 
 Section -Post
-  WriteUninstaller "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
+  WriteUninstaller "$INSTDIR\\${PRODUCT_NAME}_uninst.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
 SectionEnd
+
 Section Uninstall
     Delete "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
 @_deletefiles@
@@ -487,7 +453,10 @@ Section Uninstall
     DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
     SetAutoClose true
 SectionEnd
-
 """
 
-# --- EOF ---
+    return (NSI_HEADER
+            + "\n".join(
+                NSI_PYTHON.replace("@pythonversion@", pythonversion)
+                for pythonversion in pythonversions)
+            + NSI_FOOTER)
