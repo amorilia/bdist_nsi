@@ -426,7 +426,7 @@ Function .onInit
   strCmp $0 "Admin" +3
   
     ; if there is not a match, print message and return
-    messageBox MB_OK|MB_ICONEXCLAMATION "You require administrator privileges to install ColladaCGF successfully."
+    messageBox MB_OK|MB_ICONEXCLAMATION "You require administrator privileges to install ${PRODUCT_NAME} successfully."
     Abort ; quit installer
 
   ; select language
