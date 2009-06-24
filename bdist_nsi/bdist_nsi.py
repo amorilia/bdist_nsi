@@ -139,23 +139,58 @@ class bdist_nsi(Command):
     def build_nsi(self):
         nsiscript = get_nsi()
         metadata = self.distribution.metadata
-        lic=""
+
+        def get_full_author(key):
+            # full author and maintainer info?
+            author = key
+            author_email = "%s_email" % author
+            if (getattr(metadata, author, "")
+                and getattr(metadata, author_email, "")):
+                return '@%s@ <@%s@>' % (author, author_email)
+            elif getattr(metadata, author, ""):
+                return '@%s@' % author
+            elif getattr(metadata, author_email, ""):
+                return '@%s@' % author_email
+            else:
+                return ''
+
+        annotated_author = get_full_author("author")
+        if annotated_author:
+            nsiscript = nsiscript.replace(
+                "@annotated_author@",
+                "Author: %s$\\r$\\n" % annotated_author)
+        annotated_maintainer = get_full_author("maintainer")
+        if annotated_maintainer:
+            nsiscript = nsiscript.replace(
+                "@annotated_maintainer@",
+                "Maintainer: %s$\\r$\\n" % annotated_maintainer)
+
         for name in ["author", "author_email", "maintainer",
-                     "maintainer_email", "description", "name", "url", "version"]:
+                     "maintainer_email", "description", "name", "url",
+                     "version", "license"]:
             data = getattr(metadata, name, "")
             if data:
-                lic = lic + ("\n    %s: %s" % (string.capitalize(name), data))
-                nsiscript=nsiscript.replace('@'+name+'@',data)
-                
-        if os.path.exists('license'):
-            lic=lic + "\n\nLicense:\n" + open('license','r').read()
-            
-        if lic != "":
-            lic="Infos:\n" +lic
-            licfile=open(os.path.join(self.bdist_dir,'license'),'wt')
-            licfile.write(lic)
-            licfile.close()
-                
+                nsiscript = nsiscript.replace('@has'+name+'@', "")
+                nsiscript = nsiscript.replace('@'+name+'@',data)
+                nsiscript = nsiscript.replace(
+                    '@annotated_'+name+'@',
+                    "%s: %s$\\r$\\n"
+                    % (name.replace("_", " ").capitalize(), data))
+            else:
+                nsiscript = nsiscript.replace(
+                    '@annotated_'+name+'@', '')
+                nsiscript = nsiscript.replace('@has'+name+'@', ";")
+        # XXX todo: use the moduleinfo file in the installer?
+
+        for licensefile in ['license', 'license.txt', 'license.rst',
+                            'LICENSE', 'LICENSE.txt', 'LICENSE.rst',
+                            'LICENSE.TXT', 'LICENSE.RST']:
+            if os.path.exists(licensefile):
+                nsiscript=nsiscript.replace('@haslicensefile@', "")
+                nsiscript=nsiscript.replace('@licensefile@', licensefile)
+            else:
+                nsiscript=nsiscript.replace('@haslicensefile@', ";")
+
         # dist dir relative to the build dir
         distdir=os.path.join('..','..','..',self.dist_dir)
             
@@ -301,7 +336,7 @@ def get_nsi(pythonversions=[
 !define PRODUCT_STARTMENU_REGVAL "NSIS:StartMenuDir"
 @compile@!define MISC_COMPILE "1"
 @optimize@!define MISC_OPTIMIZE "1"
-
+@hasurl@BrandingText "@url@"
 
 
 ; Various Settings
@@ -321,6 +356,7 @@ ShowUnInstDetails show
 ; ========
 
 !include "MUI2.nsh"
+!include "LogicLib.nsh"
 
 
 
@@ -341,9 +377,9 @@ ShowUnInstDetails show
 !define MUI_WELCOMEFINISHPAGE_BITMAP "@welcome_bitmap@"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "@welcome_bitmap@"
 
-!define MUI_WELCOMEPAGE_TEXT  "This wizard will guide you through the installation of ${PRODUCT_NAME} ${PRODUCT_VERSION}.$\\r$\\n$\\r$\\nIt is recommended that you close all other applications, especially any applications that might use Python.$\\r$\\n$\\r$\\nNote to Win2k/XP/Vista users: you require administrator privileges to install ${PRODUCT_NAME} successfully."
+!define MUI_WELCOMEPAGE_TEXT  "@name@: @description@$\\r$\\n@url@$\\r$\\n$\\r$\\n@annotated_author@@annotated_maintainer@@annotated_license@$\\r$\\nThis wizard will guide you through the installation.$\\r$\\n$\\r$\\nIt is recommended that you close all other applications, especially those that might use Python."
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "license" ; XXX fix license file name
+@haslicensefile@!insertmacro MUI_PAGE_LICENSE @licensefile@
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
