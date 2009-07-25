@@ -218,6 +218,9 @@ class bdist_nsi(Command):
         _fc=[]
         lastdir=""
         for each in files:
+            # skip egg info files
+            if each[1].endswith(".egg-info"):
+                continue
             if lastdir != each[0]:
                 _f.append('  SetOutPath "$0\%s"\n' % each[0])
                 lastdir=each[0]
