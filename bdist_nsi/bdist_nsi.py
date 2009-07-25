@@ -312,11 +312,6 @@ byte_compile(g, optimize=1, force=None,
 def get_nsi(pythonversions=[
     "2.3", "2.4", "2.5", "2.6", "2.7" #, "3.0", "3.1"
     ]):
-    # python sepecific functions and sections in the nsi file
-    NSI_PYTHON = """
-!insertmacro PythonSection @pythonversion@
-"""
-
     NSI_HEADER = """\
 ; @name@ self-installer for Windows
 ; (@name@ - @url@)
@@ -347,6 +342,7 @@ SetCompressor /SOLID lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "@installer_path@"
+InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
 ShowInstDetails show
 ShowUnInstDetails show
 
@@ -402,49 +398,52 @@ ShowUnInstDetails show
 !macroend
 
 !macro PythonSection pythonversion
+; Set up variable for install path of this python version
+Var PYTHONPATH${pythonversion}
+
 ; Install the library for Python ${pythonversion}
 Section "${PRODUCT_NAME} for Python ${pythonversion}" Python${pythonversion}
     SetShellVarContext all
 
-    ; get python directory and validate
-    ReadRegStr $0 HKLM "SOFTWARE\Python\PythonCore\${pythonversion}\InstallPath" ""
-    IfErrors 0 +2
+    Push $0
 
-        Abort "Python ${pythonversion} not found."
-
-    SetOutPath $0
+    ; install files
+    StrCpy $0 $PYTHONPATH${pythonversion}
     !insertmacro InstallFiles
 
-;    !ifdef MISC_COMPILE
-;    SetOutPath "$0\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-;    File "bytecompil.py"
-;    nsExec::Exec '$0\python.exe $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
-;    !endif
-;    !ifdef MISC_OPTIMIZE
-;    SetOutPath "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-;    File "bytecompil.py"
-;    nsExec::Exec '$0\python.exe -OO $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
-;    !endif
-;    RMDir /r "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-;    RMDir "$TEMP\_python"
+    ; compile files
+    !ifdef MISC_COMPILE
+    SetOutPath "$0\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
+    File "bytecompil.py"
+    nsExec::Exec '$0\python.exe $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
+    !endif
+    !ifdef MISC_OPTIMIZE
+    SetOutPath "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
+    File "bytecompil.py"
+    nsExec::Exec '$0\python.exe -OO $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
+    !endif
+
+    ; clean up
+    RMDir /r "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
+    RMDir "$TEMP\_python"
+
+    Pop $0
 SectionEnd
 
 ; Check for valid Python ${pythonversion} installation
 Function InitPython${pythonversion}
-    Push $0
     ClearErrors
-    ReadRegStr $0 HKLM "SOFTWARE\Python\PythonCore\${pythonversion}\InstallPath" ""
+
+    ReadRegStr $PYTHONPATH${pythonversion} HKLM "SOFTWARE\Python\PythonCore\${pythonversion}\InstallPath" ""
     IfErrors 0 +2
 
       ; python @pythonversion@ not found, so disable that section
       SectionSetFlags ${Python${pythonversion}} ${SF_RO}
 
-    IfFileExists $0\python.exe +2 0
+    IfFileExists $PYTHONPATH${pythonversion}\python.exe +2 0
 
       ; python.exe not found (python manually deleted?), so disable the section
       SectionSetFlags ${Python${pythonversion}} ${SF_RO}
-
-    Pop $0
 FunctionEnd
 !macroend
 """
@@ -502,6 +501,6 @@ SectionEnd
 
     return (NSI_HEADER
             + "\n".join(
-                NSI_PYTHON.replace("@pythonversion@", pythonversion)
+                "!insertmacro PythonSection %s" % pythonversion
                 for pythonversion in pythonversions)
             + NSI_FOOTER)
