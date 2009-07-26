@@ -466,6 +466,23 @@ Section "${PRODUCT_NAME} for Python ${PYTHONVERSION}" Python${PYTHONVERSION}
     Pop $0
 SectionEnd
 
+Section un.Python${PYTHONVERSION}
+    SetShellVarContext all
+
+    Push $0
+
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
+    IfErrors un_python_end 0
+
+    StrCpy $0 $PYTHONPATH${PYTHONVERSION}
+    !insertmacro UninstallFiles
+
+un_python_end:
+
+    Pop $0
+
+SectionEnd
+
 ; Check for valid Python ${PYTHONVERSION} installation
 Function InitPython${PYTHONVERSION}
     ClearErrors
