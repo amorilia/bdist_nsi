@@ -356,6 +356,17 @@ class bdist_nsi(Command):
 # class bdist_nsi
 
 def get_nsi(pythonversions=None):
+    if "2.5" in pythonversions:
+        # maya versions that come with Python 2.5
+        mayaversions = [
+            ("2008", "2008"),
+            ("2008_x64", "2008-x64"),
+            ("2009", "2009"),
+            ("2009_x64", "2009-x64"),
+            ]
+    else:
+        mayaversions = []
+    
     NSI_HEADER = """\
 ; @name@ self-installer for Windows
 ; (@name@ - @url@)
@@ -434,6 +445,13 @@ ShowUnInstDetails show
 
 !define MUI_COMPONENTSPAGE_NODESC
 
+; Core
+; ====
+
+Section "${PRODUCT_NAME}" SecCore
+    SectionIn RO
+SectionEnd
+
 ; Macros
 ; ======
 
@@ -511,7 +529,7 @@ python_path_done:
 FunctionEnd
 
 ; Install the library for Python ${PYTHONVERSION}
-Section "${PRODUCT_NAME} for Python ${PYTHONVERSION}" Python${PYTHONVERSION}
+Section "${PYTHONVERSION}" Python${PYTHONVERSION}
     SetShellVarContext all
 
     StrCmp $PYTHONPATH${PYTHONVERSION} "" python_install_end
@@ -523,6 +541,10 @@ Section "${PRODUCT_NAME} for Python ${PYTHONVERSION}" Python${PYTHONVERSION}
 python_install_end:
 
 SectionEnd
+
+!macroend
+
+!macro un.PythonSection PYTHONVERSION
 
 Section un.Python${PYTHONVERSION}
     SetShellVarContext all
@@ -537,6 +559,104 @@ python_uninstall_end:
 SectionEnd
 
 !macroend
+
+
+
+!macro MayaSection MAYAVERSION MAYAREGISTRY
+
+; Set up variable for install path of this maya version
+Var MAYAPATH${MAYAVERSION}
+
+; Function to detect the maya path
+Function GetMayaPath${MAYAVERSION}
+    ClearErrors
+
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Maya\MayaCore\${MAYAREGISTRY}\InstallPath" ""
+    IfErrors 0 maya_registry_found
+
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Maya\MayaCore\${MAYAREGISTRY}\InstallPath" ""
+    IfErrors maya_not_found maya_registry_found
+
+maya_registry_found:
+
+    ; remove trailing backslash using the $EXEDIR trick
+    Push $MAYAPATH${MAYAVERSION}
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $MAYAPATH${MAYAVERSION}
+
+    IfFileExists $MAYAPATH${MAYAVERSION}\maya.exe maya_path_done maya_not_found
+
+maya_not_found:
+
+    StrCpy $MAYAPATH${MAYAVERSION} ""
+
+maya_path_done:
+
+FunctionEnd
+
+; Function to detect the maya path on uninstall
+Function un.GetMayaPath${MAYAVERSION}
+    ClearErrors
+
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
+    IfErrors 0 maya_registry_found
+
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
+    IfErrors maya_not_found maya_registry_found
+
+maya_registry_found:
+
+    ; remove trailing backslash using the $EXEDIR trick
+    Push $MAYAPATH${MAYAVERSION}
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $MAYAPATH${MAYAVERSION}
+
+    Goto maya_path_done
+
+maya_not_found:
+
+    StrCpy $MAYAPATH${MAYAVERSION} ""
+
+maya_path_done:
+
+FunctionEnd
+
+; Install the library for Maya ${MAYAVERSION}
+Section "${MAYAVERSION}" Maya${MAYAVERSION}
+    SetShellVarContext all
+
+    StrCmp $MAYAPATH${MAYAVERSION} "" maya_install_end
+
+    StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
+    StrCpy $1 "..\\bin\mayapy.exe"
+    !insertmacro InstallFiles
+
+maya_install_end:
+
+SectionEnd
+
+!macroend
+
+!macro un.MayaSection MAYAVERSION MAYAREGISTRY
+
+Section un.Maya${MAYAVERSION}
+    SetShellVarContext all
+
+    StrCmp $MAYAPATH${MAYAVERSION} "" maya_uninstall_end
+
+    StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
+    !insertmacro UninstallFiles
+
+maya_uninstall_end:
+
+SectionEnd
+
+!macroend
+
+
+
 """
 
     NSI_FOOTER = """
@@ -572,11 +692,24 @@ Function .onInit
     SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
 """.replace("${PYTHONVERSION}", pythonversion)
                 for pythonversion in pythonversions) + """
+
+  ; check maya versions
+""" + "\n".join("""\
+    Call GetMayaPath${MAYAVERSION}
+    StrCmp $MAYAPATH${MAYAVERSION} "" 0 +2
+    ; python version not found, so disable that section
+    SectionSetFlags ${Maya${MAYAVERSION}} ${SF_RO}
+""".replace("${MAYAVERSION}", mayaversion)
+                for mayaversion, mayaregistry in mayaversions) + """
+
 FunctionEnd
 
 Function un.onInit
 """ + "\n".join("  Call un.GetPythonPath%s" % pythonversion
                  for pythonversion in pythonversions) + """
+""" + "\n".join("  Call un.GetMayaPath%s" % mayaversion
+                 for mayaversion, mayaregistry in mayaversions) + """
+""" + """
 FunctionEnd
 
 Section -Post
@@ -588,7 +721,7 @@ Section -Post
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
 SectionEnd
 
-Section Uninstall
+Section un.Post
   Delete "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
   DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
   RmDir "$INSTDIR"
@@ -596,7 +729,24 @@ SectionEnd
 """
 
     return (NSI_HEADER
-            + "\n" + "\n".join(
+            + "\nSectionGroup /e Python\n"
+            + "\n".join(
                 "!insertmacro PythonSection %s" % pythonversion
                 for pythonversion in pythonversions)
-            + "\n" + NSI_FOOTER)
+            + "\nSectionGroupEnd\n\n"
+            + "\nSectionGroup /e un.Python\n"
+            + "\n".join(
+                "!insertmacro un.PythonSection %s" % pythonversion
+                for pythonversion in pythonversions)
+            + "\nSectionGroupEnd\n\n"
+            + "\nSectionGroup /e Maya\n"
+            + "\n".join(
+                "!insertmacro MayaSection %s %s" % (mayaversion, mayaregistry)
+                for mayaversion, mayaregistry in mayaversions)
+            + "\nSectionGroupEnd\n\n"
+            + "\nSectionGroup /e un.Maya\n"
+            + "\n".join(
+                "!insertmacro un.MayaSection %s %s" % (mayaversion, mayaregistry)
+                for mayaversion, mayaregistry in mayaversions)
+            + "\nSectionGroupEnd\n\n"
+            + NSI_FOOTER)
