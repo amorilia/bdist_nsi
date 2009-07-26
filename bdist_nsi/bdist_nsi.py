@@ -8,12 +8,15 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 
 # June 2009: further developed by Amorilia
 
-import sys, os, string, zlib, base64
+import sys, os, string
 from distutils.core import Command
 from distutils.util import get_platform
 from distutils.dir_util import create_tree, remove_tree
 from distutils.errors import *
+from distutils.sysconfig import get_python_version
+from distutils import log
 from distutils.spawn import spawn
+from distutils.command.install import WINDOWS_SCHEME
 
 class bdist_nsi(Command):
 
@@ -21,10 +24,13 @@ class bdist_nsi(Command):
 
     user_options = [('bdist-dir=', None,
                     "temporary directory for creating the distribution"),
+                    ('plat-name=', 'p',
+                     "platform name to embed in generated filenames "
+                     "(default: %s)" % get_platform()),
                     ('keep-temp', 'k',
                      "keep the pseudo-installation tree around after " +
                      "creating the distribution archive"),
-                    ('target-version=', 'v',
+                    ('target-version=', None,
                      "require a specific python version" +
                      " on the target system"),
                     ('no-target-compile', 'c',
@@ -36,6 +42,10 @@ class bdist_nsi(Command):
                      "directory to put final built distributions in"),
                     ('nsis-dir=', 'n',
                      "directory of nsis compiler"),
+                    ('title=', 't',
+                     "title to display on the installer background instead of default"),
+                    ('skip-build', None,
+                     "skip rebuilding everything (for testing/debugging)"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
@@ -43,6 +53,7 @@ class bdist_nsi(Command):
 
     def initialize_options (self):
         self.bdist_dir = None
+        self.plat_name = None
         self.keep_temp = 0
         self.no_target_compile = 0
         self.no_target_optimize = 0
@@ -51,24 +62,32 @@ class bdist_nsi(Command):
         self.nsis_dir = None
         self.bitmap = None
         self.title = None
-        self.plat_name = None
-        self.format = None
+        self.skip_build = 0
 
     # initialize_options()
 
 
     def finalize_options (self):
         if self.bdist_dir is None:
+            if self.skip_build and self.plat_name:
+                # If build is skipped and plat_name is overridden, bdist will
+                # not see the correct 'plat_name' - so set that up manually.
+                bdist = self.distribution.get_command_obj('bdist')
+                bdist.plat_name = self.plat_name
+                # next the command will be initialized using that name
             bdist_base = self.get_finalized_command('bdist').bdist_base
             self.bdist_dir = os.path.join(bdist_base, 'nsi')
         if not self.target_version:
             self.target_version = ""
-        if self.distribution.has_ext_modules():
-            short_version = sys.version[:3]
+        if not self.skip_build and self.distribution.has_ext_modules():
+            short_version = get_python_version()
             if self.target_version and self.target_version != short_version:
                 raise DistutilsOptionError, \
-                        "target version can only be" + short_version
+                      "target version can only be %s, or the '--skip_build'" \
+                      " option must be specified" % (short_version,)
             self.target_version = short_version
+
+        # find makensis executable
         if self.nsis_dir is None:
             pathlist = os.environ.get('PATH', os.defpath).split(os.pathsep)
             # common locations
@@ -79,10 +98,12 @@ class bdist_nsi(Command):
         else:
             pathlist = [self.nsis_dir]
         for path in pathlist:
+            # windows executable?
             makensis = os.path.join(path, "makensis.exe")
             if os.access(makensis, os.X_OK):
                 self.nsis_dir = makensis
                 break
+            # linux executable? (for instance on Fedora 11)
             makensis = os.path.join(path, "makensis")
             if os.access(makensis, os.X_OK):
                 self.nsis_dir = makensis
@@ -93,45 +114,68 @@ class bdist_nsi(Command):
                 "add NSIS directory to the path or specify it "
                 "with --nsis-dir")
             self.nsis_dir = None
+
         self.set_undefined_options('bdist',
                                    ('dist_dir', 'dist_dir'),
-                                   ('nsis_dir', 'nsis_dir'))
+                                   ('plat_name', 'plat_name'),
+                                   ('nsis_dir', 'nsis_dir'),
+                                  )
 
     # finalize_options()
 
 
     def run (self):
-        if (sys.platform != "win32" and (self.distribution.has_ext_modules() or self.distribution.has_c_libraries())):
-                raise DistutilsPlatformError ("This distribution contains extensions and/or C libraries; must be compiled on a Windows 32 platform")
-        
-        
-        self.run_command('build')
+        if (sys.platform != "win32" and
+            (self.distribution.has_ext_modules() or
+             self.distribution.has_c_libraries())):
+            raise DistutilsPlatformError \
+                  ("distribution contains extensions and/or C libraries; "
+                   "must be compiled on a Windows 32 platform")
+
+        if not self.skip_build:
+            self.run_command('build')
 
         install = self.reinitialize_command('install', reinit_subcommands=1)
         install.root = self.bdist_dir
+        install.skip_build = self.skip_build
         install.warn_dir = 0
+        install.plat_name = self.plat_name
 
-        install.compile = 0
-        install.optimize = 0
-        
+        install_lib = self.reinitialize_command('install_lib')
+        # we do not want to include pyc or pyo files
+        install_lib.compile = 0
+        install_lib.optimize = 0
 
-        for key in ('purelib', 'platlib', 'headers', 'scripts', 'data'):
-            if key in ['purelib','platlib'] and sys.version > "2.2":
-                value = '_python/Lib/site-packages'
-            else:
-                value = '_python'
-            if key == 'headers':
-                value = '_python/Include/$dist_name'
-            if key == 'scripts':
-                value = '_python/Scripts'
-            setattr(install, 'install_' + key, value)
-        self.announce("installing to %s" % self.bdist_dir)
-        self.run_command('install')
+        if self.distribution.has_ext_modules():
+            # If we are building an installer for a Python version other
+            # than the one we are currently running, then we need to ensure
+            # our build_lib reflects the other Python version rather than ours.
+            # Note that for target_version!=sys.version, we must have skipped the
+            # build step, so there is no issue with enforcing the build of this
+            # version.
+            target_version = self.target_version
+            if not target_version:
+                assert self.skip_build, "Should have already checked this"
+                target_version = sys.version[0:3]
+            plat_specifier = ".%s-%s" % (self.plat_name, target_version)
+            build = self.get_finalized_command('build')
+            build.build_lib = os.path.join(build.build_base,
+                                           'lib' + plat_specifier)
+        # use windows installation scheme
+        for key in WINDOWS_SCHEME.keys():
+            value = WINDOWS_SCHEME[key].replace("$base", "_python")
+            setattr(install,
+                    'install_' + key,
+                    value)
+
+        log.info("installing to %s", self.bdist_dir)
+        install.ensure_finalized()
+        install.run()
 
         self.build_nsi()
         
         if not self.keep_temp:
-            remove_tree(self.bdist_dir, self.verbose, self.dry_run)        
+            remove_tree(self.bdist_dir, dry_run=self.dry_run)
 
     # run()
 
@@ -475,9 +519,6 @@ Function .onInit
     ; if there is not a match, print message and return
     messageBox MB_OK|MB_ICONEXCLAMATION "You require administrator privileges to install ${PRODUCT_NAME} successfully."
     Abort ; quit installer
-
-  ; select language
-  !insertmacro MUI_LANGDLL_DISPLAY
 
   ; check python versions
 """ + "\n".join("  call InitPython%s" % pythonversion
