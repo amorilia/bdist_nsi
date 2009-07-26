@@ -181,7 +181,10 @@ class bdist_nsi(Command):
 
     
     def build_nsi(self):
-        nsiscript = get_nsi()
+        if self.target_version.upper() not in ["","ANY"]:
+            nsiscript = get_nsi(pythonversions=[self.target_version])
+        else:
+            nsiscript = get_nsi(pythonversions=["2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"])
         metadata = self.distribution.metadata
 
         def get_full_author(key):
@@ -286,15 +289,15 @@ class bdist_nsi(Command):
         # compile modules
         _f.append('  !ifdef MISC_COMPILE\n')
         _f.append('  SetOutPath "$0"\n')
-        _f.append("""  nsExec::ExecToLog "$0\python.exe -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
+        _f.append("""  nsExec::ExecToLog "$0\$1 -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
         for root in _froots:
-            _f.append("""  nsExec::ExecToLog "$0\python.exe -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+            _f.append("""  nsExec::ExecToLog "$0\$1 -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
         _f.append('  !endif\n')
         _f.append('  !ifdef MISC_OPTIMIZE\n')
         _f.append('  SetOutPath "$0"\n')
-        _f.append("""  nsExec::ExecToLog "$0\python.exe -OO -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
+        _f.append("""  nsExec::ExecToLog "$0\$1 -OO -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
         for root in _froots:
-            _f.append("""  nsExec::ExecToLog "$0\python.exe -OO -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+            _f.append("""  nsExec::ExecToLog "$0\$1 -OO -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
         _f.append('  !endif\n')
         nsiscript=nsiscript.replace('@_files@',''.join(_f))
         nsiscript=nsiscript.replace('@_deletefiles@',''.join(_fd))
@@ -352,9 +355,7 @@ class bdist_nsi(Command):
             
 # class bdist_nsi
 
-def get_nsi(pythonversions=[
-    "2.3", "2.4", "2.5", "2.6", "2.7" #, "3.0", "3.1"
-    ]):
+def get_nsi(pythonversions=None):
     NSI_HEADER = """\
 ; @name@ self-installer for Windows
 ; (@name@ - @url@)
@@ -436,68 +437,105 @@ ShowUnInstDetails show
 ; Macros
 ; ======
 
+; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
+; $1 = python executable (typically, python.exe)
 !macro InstallFiles
 @_files@
 !macroend
 
+; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
 !macro UninstallFiles
 @_deletefiles@
 @_deletedirs@
 !macroend
 
 !macro PythonSection PYTHONVERSION
+
 ; Set up variable for install path of this python version
 Var PYTHONPATH${PYTHONVERSION}
+
+; Function to detect the python path
+Function GetPythonPath${PYTHONVERSION}
+    ClearErrors
+
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
+    IfErrors 0 python_registry_found
+
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
+    IfErrors python_not_found python_registry_found
+
+python_registry_found:
+
+    ; remove trailing backslash using the $EXEDIR trick
+    Push $PYTHONPATH${PYTHONVERSION}
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $PYTHONPATH${PYTHONVERSION}
+
+    IfFileExists $PYTHONPATH${PYTHONVERSION}\python.exe python_path_done python_not_found
+
+python_not_found:
+
+    StrCpy $PYTHONPATH${PYTHONVERSION} ""
+
+python_path_done:
+
+FunctionEnd
+
+; Function to detect the python path on uninstall
+Function un.GetPythonPath${PYTHONVERSION}
+    ClearErrors
+
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
+    IfErrors 0 python_registry_found
+
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
+    IfErrors python_not_found python_registry_found
+
+python_registry_found:
+
+    ; remove trailing backslash using the $EXEDIR trick
+    Push $PYTHONPATH${PYTHONVERSION}
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $PYTHONPATH${PYTHONVERSION}
+
+    Goto python_path_done
+
+python_not_found:
+
+    StrCpy $PYTHONPATH${PYTHONVERSION} ""
+
+python_path_done:
+
+FunctionEnd
 
 ; Install the library for Python ${PYTHONVERSION}
 Section "${PRODUCT_NAME} for Python ${PYTHONVERSION}" Python${PYTHONVERSION}
     SetShellVarContext all
 
-    Push $0
+    StrCmp $PYTHONPATH${PYTHONVERSION} "" python_install_end
 
-    ; install and compile files
     StrCpy $0 $PYTHONPATH${PYTHONVERSION}
+    StrCpy $1 "python.exe"
     !insertmacro InstallFiles
 
-    ; clean up
-    RMDir /r "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-    RMDir "$TEMP\_python"
+python_install_end:
 
-    Pop $0
 SectionEnd
 
 Section un.Python${PYTHONVERSION}
     SetShellVarContext all
 
-    Push $0
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors un_python_end 0
+    StrCmp $PYTHONPATH${PYTHONVERSION} "" python_uninstall_end
 
     StrCpy $0 $PYTHONPATH${PYTHONVERSION}
     !insertmacro UninstallFiles
 
-un_python_end:
-
-    Pop $0
+python_uninstall_end:
 
 SectionEnd
 
-; Check for valid Python ${PYTHONVERSION} installation
-Function InitPython${PYTHONVERSION}
-    ClearErrors
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors 0 +2
-
-      ; python version not found, so disable that section
-      SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
-
-    IfFileExists $PYTHONPATH${PYTHONVERSION}\python.exe +2 0
-
-      ; python.exe not found (python manually deleted?), so disable the section
-      SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
-FunctionEnd
 !macroend
 """
 
@@ -527,7 +565,17 @@ Function .onInit
     Abort ; quit installer
 
   ; check python versions
-""" + "\n".join("  call InitPython%s" % pythonversion
+""" + "\n".join("""\
+    Call GetPythonPath${PYTHONVERSION}
+    StrCmp $PYTHONPATH${PYTHONVERSION} "" 0 +2
+    ; python version not found, so disable that section
+    SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
+""".replace("${PYTHONVERSION}", pythonversion)
+                for pythonversion in pythonversions) + """
+FunctionEnd
+
+Function un.onInit
+""" + "\n".join("  Call un.GetPythonPath%s" % pythonversion
                  for pythonversion in pythonversions) + """
 FunctionEnd
 
@@ -543,13 +591,12 @@ SectionEnd
 Section Uninstall
   Delete "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
   DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
-
-  ; TODO: delete files
+  RmDir "$INSTDIR"
 SectionEnd
 """
 
     return (NSI_HEADER
-            + "\n".join(
+            + "\n" + "\n".join(
                 "!insertmacro PythonSection %s" % pythonversion
                 for pythonversion in pythonversions)
-            + NSI_FOOTER)
+            + "\n" + NSI_FOOTER)
