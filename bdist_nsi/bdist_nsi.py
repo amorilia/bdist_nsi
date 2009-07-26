@@ -260,6 +260,7 @@ class bdist_nsi(Command):
         _d=[]
         _fd=[]
         _fc=[]
+        _froots=[]
         lastdir=""
         for each in files:
             # skip egg info files
@@ -270,6 +271,11 @@ class bdist_nsi(Command):
                 lastdir=each[0]
                 if each[0] not in ['Lib\\site-packages','Scripts','Include','']:
                     _d.insert(0,'    RMDir "$0\\'+each[0]+'\"\n')
+                    # find root directories of modules
+                    if each[0].startswith("Lib\\site-packages\\"):
+                        root = "\\".join(each[0].split("\\")[:3])
+                        if root not in _froots:
+                            _froots.append(root)
             _f.append('  File "_python\\'+each[1]+'\"\n')
             
             if (each[1][len(each[1])-3:].lower() == ".py"):
@@ -277,17 +283,22 @@ class bdist_nsi(Command):
                 _fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
                 _fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
             _fd.append('    Delete "$0\\'+each[1]+'\"\n')
+        # compile modules
+        _f.append('  !ifdef MISC_COMPILE\n')
+        _f.append('  SetOutPath "$0"\n')
+        _f.append("""  nsExec::ExecToLog "$0\python.exe -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
+        for root in _froots:
+            _f.append("""  nsExec::ExecToLog "$0\python.exe -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+        _f.append('  !endif\n')
+        _f.append('  !ifdef MISC_OPTIMIZE\n')
+        _f.append('  SetOutPath "$0"\n')
+        _f.append("""  nsExec::ExecToLog "$0\python.exe -OO -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
+        for root in _froots:
+            _f.append("""  nsExec::ExecToLog "$0\python.exe -OO -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+        _f.append('  !endif\n')
         nsiscript=nsiscript.replace('@_files@',''.join(_f))
         nsiscript=nsiscript.replace('@_deletefiles@',''.join(_fd))
         nsiscript=nsiscript.replace('@_deletedirs@',''.join(_d))
-        
-        
-        if (not self.no_target_compile) or (not self.no_target_optimize):
-            bytecompilscript=BYTECOMPILE_DATA.replace('@py_files@',''.join(_fc))
-            bytecompilfile=open(os.path.join(self.bdist_dir,'bytecompil.py'),'wt')
-            bytecompilfile.write(bytecompilscript)
-            bytecompilfile.close()
-            
         
         if not self.no_target_compile:
             nsiscript=nsiscript.replace('@compile@','')
@@ -340,21 +351,6 @@ class bdist_nsi(Command):
 
             
 # class bdist_nsi
-
-BYTECOMPILE_DATA="""\
-from distutils.util import byte_compile
-import sys
-import os
-d=os.path.dirname(sys.executable)
-f=[@py_files@]
-g=[]
-for each in f:
-    g.append(d+os.sep+each)
-byte_compile(g, optimize=1, force=None,
-                    prefix=d, base_dir=None,
-                    verbose=1, dry_run=0,
-                    direct=1)
-"""
 
 def get_nsi(pythonversions=[
     "2.3", "2.4", "2.5", "2.6", "2.7" #, "3.0", "3.1"
@@ -444,31 +440,24 @@ ShowUnInstDetails show
 @_files@
 !macroend
 
-!macro PythonSection pythonversion
-; Set up variable for install path of this python version
-Var PYTHONPATH${pythonversion}
+!macro UninstallFiles
+@_deletefiles@
+@_deletedirs@
+!macroend
 
-; Install the library for Python ${pythonversion}
-Section "${PRODUCT_NAME} for Python ${pythonversion}" Python${pythonversion}
+!macro PythonSection PYTHONVERSION
+; Set up variable for install path of this python version
+Var PYTHONPATH${PYTHONVERSION}
+
+; Install the library for Python ${PYTHONVERSION}
+Section "${PRODUCT_NAME} for Python ${PYTHONVERSION}" Python${PYTHONVERSION}
     SetShellVarContext all
 
     Push $0
 
-    ; install files
-    StrCpy $0 $PYTHONPATH${pythonversion}
+    ; install and compile files
+    StrCpy $0 $PYTHONPATH${PYTHONVERSION}
     !insertmacro InstallFiles
-
-    ; compile files
-    !ifdef MISC_COMPILE
-    SetOutPath "$0\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-    File "bytecompil.py"
-    nsExec::Exec '$0\python.exe $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
-    !endif
-    !ifdef MISC_OPTIMIZE
-    SetOutPath "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
-    File "bytecompil.py"
-    nsExec::Exec '$0\python.exe -OO $TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}\\bytecompil.py' $9
-    !endif
 
     ; clean up
     RMDir /r "$TEMP\_python\${PRODUCT_NAME}_${PRODUCT_VERSION}"
@@ -477,20 +466,20 @@ Section "${PRODUCT_NAME} for Python ${pythonversion}" Python${pythonversion}
     Pop $0
 SectionEnd
 
-; Check for valid Python ${pythonversion} installation
-Function InitPython${pythonversion}
+; Check for valid Python ${PYTHONVERSION} installation
+Function InitPython${PYTHONVERSION}
     ClearErrors
 
-    ReadRegStr $PYTHONPATH${pythonversion} HKLM "SOFTWARE\Python\PythonCore\${pythonversion}\InstallPath" ""
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
     IfErrors 0 +2
 
-      ; python @pythonversion@ not found, so disable that section
-      SectionSetFlags ${Python${pythonversion}} ${SF_RO}
+      ; python version not found, so disable that section
+      SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
 
-    IfFileExists $PYTHONPATH${pythonversion}\python.exe +2 0
+    IfFileExists $PYTHONPATH${PYTHONVERSION}\python.exe +2 0
 
       ; python.exe not found (python manually deleted?), so disable the section
-      SectionSetFlags ${Python${pythonversion}} ${SF_RO}
+      SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
 FunctionEnd
 !macroend
 """
@@ -535,11 +524,10 @@ Section -Post
 SectionEnd
 
 Section Uninstall
-    Delete "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
-@_deletefiles@
-@_deletedirs@
-    DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
-    SetAutoClose true
+  Delete "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
+  DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
+
+  ; TODO: delete files
 SectionEnd
 """
 
