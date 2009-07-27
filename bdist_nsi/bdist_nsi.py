@@ -234,9 +234,11 @@ class bdist_nsi(Command):
                             'LICENSE.TXT', 'LICENSE.RST']:
             if os.path.exists(licensefile):
                 nsiscript=nsiscript.replace('@haslicensefile@', "")
-                nsiscript=nsiscript.replace('@licensefile@', licensefile)
-            else:
-                nsiscript=nsiscript.replace('@haslicensefile@', ";")
+                nsiscript=nsiscript.replace('@licensefile@',
+                                            os.path.abspath(licensefile))
+                break
+        else:
+            nsiscript=nsiscript.replace('@haslicensefile@', ";")
 
         # dist dir relative to the build dir
         distdir=os.path.join('..','..','..',self.dist_dir)
@@ -385,7 +387,6 @@ def get_nsi(pythonversions=None):
 !define PRODUCT_WEB_SITE "@url@"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
-!define PRODUCT_STARTMENU_REGVAL "NSIS:StartMenuDir"
 @compile@!define MISC_COMPILE "1"
 @optimize@!define MISC_OPTIMIZE "1"
 @hasurl@BrandingText "@url@"
@@ -399,7 +400,7 @@ SetCompressor /SOLID lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "@installer_path@"
-InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
+InstallDir "$PROGRAMFILES\\${PRODUCT_NAME}"
 ShowInstDetails show
 ShowUnInstDetails show
 
@@ -432,7 +433,7 @@ ShowUnInstDetails show
 
 !define MUI_WELCOMEPAGE_TEXT  "@name@: @description@$\\r$\\n@url@$\\r$\\n$\\r$\\n@annotated_author@@annotated_maintainer@@annotated_license@$\\r$\\nThis wizard will guide you through the installation.$\\r$\\n$\\r$\\nIt is recommended that you close all other applications, especially those that might use Python."
 !insertmacro MUI_PAGE_WELCOME
-@haslicensefile@!insertmacro MUI_PAGE_LICENSE @licensefile@
+@haslicensefile@!insertmacro MUI_PAGE_LICENSE "@licensefile@"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
