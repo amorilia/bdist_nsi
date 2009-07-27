@@ -339,7 +339,9 @@ class bdist_nsi(Command):
         for each in fil:
             if not os.path.isdir(dir+os.sep+each):
                 f=str(dir+os.sep+each)[len(self.bdist_dir+os.sep+'_python'+os.sep):]
-                arg.append([os.path.dirname(f),f])
+                # replace / by \\ so it works on linux too
+                arg.append([os.path.dirname(f).replace("/", "\\"),
+                            f.replace("/", "\\")])
                 
     def compile(self):
         if self.nsis_dir is not None:
@@ -723,7 +725,8 @@ Function un.onInit
 FunctionEnd
 
 Section -Post
-  WriteUninstaller "$INSTDIR\\${PRODUCT_NAME}_uninst.exe"
+  SetOutPath "$INSTDIR"
+  WriteUninstaller "$INSTDIR\\${PRODUCT_NAME}_uninstall.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
@@ -732,9 +735,9 @@ Section -Post
 SectionEnd
 
 Section un.Post
-  Delete "$INSTDIR\${PRODUCT_NAME}_uninst.exe"
-  DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
+  Delete "$INSTDIR\\${PRODUCT_NAME}_uninstall.exe"
   RmDir "$INSTDIR"
+  DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
 SectionEnd
 """
 
