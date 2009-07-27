@@ -490,6 +490,9 @@ python_registry_found:
     Exch $EXEDIR
     Pop $PYTHONPATH${PYTHONVERSION}
 
+    ; debug
+    ;MessageBox MB_OK "Found Python ${PYTHONVERSION} in $PYTHONPATH${PYTHONVERSION}"
+
     IfFileExists $PYTHONPATH${PYTHONVERSION}\python.exe python_path_done python_not_found
 
 python_not_found:
@@ -571,11 +574,13 @@ Var MAYAPATH${MAYAVERSION}
 Function GetMayaPath${MAYAVERSION}
     ClearErrors
 
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Maya\MayaCore\${MAYAREGISTRY}\InstallPath" ""
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
     IfErrors 0 maya_registry_found
 
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Maya\MayaCore\${MAYAREGISTRY}\InstallPath" ""
-    IfErrors maya_not_found maya_registry_found
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
+    IfErrors 0 maya_registry_found
+
+    Goto maya_not_found
 
 maya_registry_found:
 
@@ -585,7 +590,10 @@ maya_registry_found:
     Exch $EXEDIR
     Pop $MAYAPATH${MAYAVERSION}
 
-    IfFileExists $MAYAPATH${MAYAVERSION}\maya.exe maya_path_done maya_not_found
+    ; debug
+    ;MessageBox MB_OK "Found Maya ${MAYAVERSION} in $MAYAPATH${MAYAVERSION}"
+
+    IfFileExists $MAYAPATH${MAYAVERSION}\\bin\mayapy.exe maya_path_done maya_not_found
 
 maya_not_found:
 
@@ -603,7 +611,9 @@ Function un.GetMayaPath${MAYAVERSION}
     IfErrors 0 maya_registry_found
 
     ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
-    IfErrors maya_not_found maya_registry_found
+    IfErrors 0 maya_registry_found
+
+    Goto maya_not_found
 
 maya_registry_found:
 
