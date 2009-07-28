@@ -42,6 +42,12 @@ class bdist_nsi(Command):
                      "directory to put final built distributions in"),
                     ('nsis-dir=', 'n',
                      "directory of nsis compiler"),
+                    ('bitmap=', 'b',
+                     "bitmap (size 164x314) to use for the " +
+                     "installer instead of python-powered logo"),
+                    ('headerbitmap=', None,
+                     "header bitmap (size 150x57) to use for the " +
+                     "installer instead of python-powered logo"),
                     ('title=', 't',
                      "title to display on the installer background instead of default"),
                     ('skip-build', None,
@@ -61,6 +67,7 @@ class bdist_nsi(Command):
         self.dist_dir = None
         self.nsis_dir = None
         self.bitmap = None
+        self.headerbitmap = None
         self.title = None
         self.skip_build = 0
 
@@ -114,6 +121,17 @@ class bdist_nsi(Command):
                 "add NSIS directory to the path or specify it "
                 "with --nsis-dir")
             self.nsis_dir = None
+
+        if not self.headerbitmap:
+            self.headerbitmap = os.path.join(os.path.dirname(__file__),
+                                             "python-install-150x57.bmp")
+        else:
+            self.headerbitmap = os.path.abspath(self.headerbitmap)
+        if not self.bitmap:
+            self.bitmap = os.path.join(os.path.dirname(__file__),
+                                       "python-install-164x314.bmp")
+        else:
+            self.bitmap = os.path.abspath(self.bitmap)
 
         self.set_undefined_options('bdist',
                                    ('dist_dir', 'dist_dir'),
@@ -323,13 +341,8 @@ class bdist_nsi(Command):
         nsiscript = nsiscript.replace(
             "@ico_uninstall@",
             os.path.join(os.path.dirname(__file__), "python-uninstall.ico"))
-        nsiscript = nsiscript.replace(
-            "@header_bitmap@",
-            os.path.join(os.path.dirname(__file__), "python-install-150x57.bmp"))
-        nsiscript = nsiscript.replace(
-            "@welcome_bitmap@",
-            os.path.join(os.path.dirname(__file__), "python-install-164x314.bmp"))
-
+        nsiscript = nsiscript.replace("@header_bitmap@", self.headerbitmap)
+        nsiscript = nsiscript.replace("@welcome_bitmap@", self.bitmap)
         nsifile=open(os.path.join(self.bdist_dir,'setup.nsi'),'wt')
         nsifile.write(nsiscript)
         nsifile.close()
