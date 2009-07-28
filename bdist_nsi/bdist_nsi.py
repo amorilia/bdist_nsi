@@ -444,14 +444,13 @@ ShowUnInstDetails show
 !define MUI_WELCOMEFINISHPAGE_BITMAP "@welcome_bitmap@"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "@welcome_bitmap@"
 
-!define MUI_WELCOMEPAGE_TEXT  "@name@: @description@$\\r$\\n@url@$\\r$\\n$\\r$\\n@annotated_author@@annotated_maintainer@@annotated_license@$\\r$\\nThis wizard will guide you through the installation.$\\r$\\n$\\r$\\nIt is recommended that you close all other applications, especially those that might use Python."
 !insertmacro MUI_PAGE_WELCOME
 @haslicensefile@!insertmacro MUI_PAGE_LICENSE "@licensefile@"
 !insertmacro MUI_PAGE_COMPONENTS
+!insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 
-!define MUI_WELCOMEPAGE_TEXT  "This wizard will guide you through the uninstallation of ${PRODUCT_NAME} ${PRODUCT_VERSION}.$\\r$\\n$\\r$\\nBefore starting the uninstallation, make sure ${PRODUCT_NAME} is not running.$\\r$\\n$\\r$\\nClick Next to continue."
 !insertmacro MUI_UNPAGE_WELCOME
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -464,7 +463,7 @@ ShowUnInstDetails show
 ; Core
 ; ====
 
-Section "${PRODUCT_NAME}" SecCore
+Section "Core" Core
     SectionIn RO
 SectionEnd
 
