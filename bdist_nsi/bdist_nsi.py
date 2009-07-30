@@ -6,7 +6,7 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 # Created 2005/05/24, j-cg , inspired by the bdist_wininst of the python
 # distribution
 
-# June 2009: further developed by Amorilia
+# June/July 2009: further developed by Amorilia
 
 import sys, os, string
 from distutils.core import Command
@@ -52,10 +52,12 @@ class bdist_nsi(Command):
                      "title to display on the installer background instead of default"),
                     ('skip-build', None,
                      "skip rebuilding everything (for testing/debugging)"),
+                    ('run2to3', None,
+                     "run 2to3 on 3.x installs"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
-                       'skip-build']
+                       'skip-build', 'run2to3']
 
     def initialize_options (self):
         self.bdist_dir = None
@@ -70,6 +72,7 @@ class bdist_nsi(Command):
         self.headerbitmap = None
         self.title = None
         self.skip_build = 0
+        self.run2to3 = 0
 
     # initialize_options()
 
@@ -202,7 +205,10 @@ class bdist_nsi(Command):
         if self.target_version.upper() not in ["","ANY"]:
             nsiscript = get_nsi(pythonversions=[self.target_version])
         else:
-            nsiscript = get_nsi(pythonversions=["2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"])
+            pythonversions = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"]
+            if self.run2to3:
+                pythonversions.extend(["3.0", "3.1", "3.2", "3.3", "3.4"])
+            nsiscript = get_nsi(pythonversions=pythonversions)
         metadata = self.distribution.metadata
 
         def get_full_author(key):
@@ -306,6 +312,17 @@ class bdist_nsi(Command):
                 _fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
                 _fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
             _fd.append('    Delete "$0\\'+each[1]+'\"\n')
+        # 2to3
+        _f.append('  !ifdef MISC_2TO3\n')
+        _f.append('  Push $9\n')
+        _f.append('  StrCpy $9 "${PYTHONVERSION}" 1\n')
+        _f.append('  StrCmp $9 "3" 0 end2to3\n')
+        _f.append('  SetOutPath "$0"\n')
+        for root in _froots:
+            _f.append("""  nsExec::ExecToLog "$0\\$1 $\\"$0\\Tools\\Scripts\\2to3.py$\\" -w $\\"$0\\%s$\\""\n""" % root)
+        _f.append('end2to3:\n')
+        _f.append('  Pop $9\n')
+        _f.append('  !endif\n')
         # compile modules
         _f.append('  !ifdef MISC_COMPILE\n')
         _f.append('  SetOutPath "$0"\n')
@@ -332,6 +349,11 @@ class bdist_nsi(Command):
             nsiscript=nsiscript.replace('@optimize@','')
         else:
             nsiscript=nsiscript.replace('@optimize@',';')   
+
+        if self.run2to3:
+            nsiscript=nsiscript.replace('@2to3@','')
+        else:
+            nsiscript=nsiscript.replace('@2to3@',';')   
 
         # icon files
         # XXX todo: make icons configurable
@@ -402,6 +424,7 @@ def get_nsi(pythonversions=None):
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 @compile@!define MISC_COMPILE "1"
 @optimize@!define MISC_OPTIMIZE "1"
+@2to3@!define MISC_2TO3 "1"
 @hasurl@BrandingText "@url@"
 
 
@@ -472,7 +495,7 @@ SectionEnd
 
 ; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
 ; $1 = python executable (typically, python.exe)
-!macro InstallFiles
+!macro InstallFiles PYTHONVERSION
 @_files@
 !macroend
 
@@ -554,7 +577,7 @@ Section "${PYTHONVERSION}" Python${PYTHONVERSION}
 
     StrCpy $0 $PYTHONPATH${PYTHONVERSION}
     StrCpy $1 "python.exe"
-    !insertmacro InstallFiles
+    !insertmacro InstallFiles ${PYTHONVERSION}
 
 python_install_end:
 
@@ -656,7 +679,7 @@ Section "${MAYAVERSION}" Maya${MAYAVERSION}
 
     StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
     StrCpy $1 "..\\bin\mayapy.exe"
-    !insertmacro InstallFiles
+    !insertmacro InstallFiles ${PYTHONVERSION}
 
 maya_install_end:
 
