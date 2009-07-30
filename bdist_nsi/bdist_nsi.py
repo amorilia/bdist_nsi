@@ -310,9 +310,14 @@ class bdist_nsi(Command):
             
             if (each[1][len(each[1])-3:].lower() == ".py"):
                 _fc.append('"'+each[1]+'",\n')
-                #_fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
-                #_fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
-            #_fd.append('    Delete "$0\\'+each[1]+'\"\n')
+                if each[0].lower() == "scripts":
+                    _fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
+                    _fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
+            if each[0].lower() == "scripts":
+                _fd.append('    Delete "$0\\'+each[1]+'\"\n')
+        _fd.append('    Delete "$0\\Remove${PRODUCT_NAME}.*"\n')
+        _fd.append('    Delete "$0\\${PRODUCT_NAME}-wininst.log"\n')
+        _fd.append('    Delete "$0\\${PRODUCT_NAME}*.*"\n')
         # 2to3
         _f.append('  !ifdef MISC_2TO3\n')
         _f.append('  Push $9\n')
