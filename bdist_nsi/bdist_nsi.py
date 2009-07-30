@@ -299,19 +299,20 @@ class bdist_nsi(Command):
                 _f.append('  SetOutPath "$0\%s"\n' % each[0])
                 lastdir=each[0]
                 if each[0] not in ['Lib\\site-packages','Scripts','Include','']:
-                    _d.insert(0,'    RMDir "$0\\'+each[0]+'\"\n')
+                    #_d.insert(0,'    RMDir "$0\\'+each[0]+'\"\n')
                     # find root directories of modules
                     if each[0].startswith("Lib\\site-packages\\"):
                         root = "\\".join(each[0].split("\\")[:3])
                         if root not in _froots:
                             _froots.append(root)
+                            _d.append('    RMDir /r "$0\\%s"\n' % root)
             _f.append('  File "_python\\'+each[1]+'\"\n')
             
             if (each[1][len(each[1])-3:].lower() == ".py"):
                 _fc.append('"'+each[1]+'",\n')
-                _fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
-                _fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
-            _fd.append('    Delete "$0\\'+each[1]+'\"\n')
+                #_fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
+                #_fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
+            #_fd.append('    Delete "$0\\'+each[1]+'\"\n')
         # 2to3
         _f.append('  !ifdef MISC_2TO3\n')
         _f.append('  Push $9\n')
@@ -319,7 +320,7 @@ class bdist_nsi(Command):
         _f.append('  StrCmp $9 "3" 0 end2to3\n')
         _f.append('  SetOutPath "$0"\n')
         for root in _froots:
-            _f.append("""  nsExec::ExecToLog "$0\\$1 $\\"$0\\Tools\\Scripts\\2to3.py$\\" -w $\\"$0\\%s$\\""\n""" % root)
+            _f.append("""  nsExec::ExecToLog "$0\\$1 $\\"$0\\Tools\\Scripts\\2to3.py$\\" -w -n $\\"$0\\%s$\\""\n""" % root)
         _f.append('end2to3:\n')
         _f.append('  Pop $9\n')
         _f.append('  !endif\n')
