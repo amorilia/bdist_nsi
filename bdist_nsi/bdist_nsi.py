@@ -830,44 +830,11 @@ SectionEnd
 !insertmacro Locate
 !insertmacro VersionCompare
 
-; taken from http://nsis.sourceforge.net/Open_link_in_new_browser_window
-# uses $0
-Function openLinkNewWindow
-  Push $3 
-  Push $2
-  Push $1
-  Push $0
-  ReadRegStr $0 HKCR "http\shell\open\command" ""
-# Get browser path
-    DetailPrint $0
-  StrCpy $2 '"'
-  StrCpy $1 $0 1
-  StrCmp $1 $2 +2 # if path is not enclosed in " look for space as final char
-    StrCpy $2 ' '
-  StrCpy $3 1
-  loop:
-    StrCpy $1 $0 1 $3
-    DetailPrint $1
-    StrCmp $1 $2 found
-    StrCmp $1 "" found
-    IntOp $3 $3 + 1
-    Goto loop
- 
-  found:
-    StrCpy $1 $0 $3
-    StrCmp $2 " " +2
-      StrCpy $1 '$1"'
- 
-  Pop $0
-  Exec '$1 $0'
-  Pop $1
-  Pop $2
-  Pop $3
-FunctionEnd
-
 !macro SearchDLL DLLLABEL DLLDESC DLLFILE DLLVERSION DLLLINK
+
 Var DLLFound${DLLLABEL}
 
+!define REQUIREOPENLINKNEWWINDOW "1"
 Function Download${DLLLABEL}
   Push ${DLLLINK}
   MessageBox MB_OK "You will need to download ${DLLDESC}. Pressing OK will take you to the download page, please follow the instructions on the page that appears."
@@ -939,6 +906,43 @@ FunctionEnd
     NSI_FOOTER = """
 ; Functions
 ; =========
+
+!ifdef REQUIREOPENLINKNEWWINDOW
+; taken from http://nsis.sourceforge.net/Open_link_in_new_browser_window
+# uses $0
+Function openLinkNewWindow
+  Push $3 
+  Push $2
+  Push $1
+  Push $0
+  ReadRegStr $0 HKCR "http\shell\open\command" ""
+# Get browser path
+    DetailPrint $0
+  StrCpy $2 '"'
+  StrCpy $1 $0 1
+  StrCmp $1 $2 +2 # if path is not enclosed in " look for space as final char
+    StrCpy $2 ' '
+  StrCpy $3 1
+  loop:
+    StrCpy $1 $0 1 $3
+    DetailPrint $1
+    StrCmp $1 $2 found
+    StrCmp $1 "" found
+    IntOp $3 $3 + 1
+    Goto loop
+ 
+  found:
+    StrCpy $1 $0 $3
+    StrCmp $2 " " +2
+      StrCpy $1 '$1"'
+ 
+  Pop $0
+  Exec '$1 $0'
+  Pop $1
+  Pop $2
+  Pop $3
+FunctionEnd
+!endif
 
 Function .onInit
   MessageBox MB_YESNO|MB_ICONEXCLAMATION "Installer is experimental and is likely to fail. Continue?" IDYES +2
