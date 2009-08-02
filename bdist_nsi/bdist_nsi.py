@@ -54,10 +54,19 @@ class bdist_nsi(Command):
                      "skip rebuilding everything (for testing/debugging)"),
                     ('run2to3', None,
                      "run 2to3 on 3.x installs"),
+                    ('msvc2005', None,
+                     "check if msvc 2005 redistributable package is installed"),
+                    ('msvc2005sp1', None,
+                     "check if msvc 2005 sp1 redistributable package is installed"),
+                    ('msvc2008', None,
+                     "check if msvc 2008 redistributable package is installed"),
+                    ('msvc2008sp1', None,
+                     "check if msvc 2008 sp1 redistributable package is installed"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
-                       'skip-build', 'run2to3']
+                       'skip-build', 'run2to3', 'msvc2005', 'msvc2005sp1',
+                       'msvc2008', 'msvc2008sp1']
 
     def initialize_options (self):
         self.bdist_dir = None
@@ -73,6 +82,10 @@ class bdist_nsi(Command):
         self.title = None
         self.skip_build = 0
         self.run2to3 = 0
+        self.msvc2005 = 0
+        self.msvc2005sp1 = 0
+        self.msvc2008 = 0
+        self.msvc2008sp1 = 0
 
     # initialize_options()
 
@@ -361,6 +374,26 @@ class bdist_nsi(Command):
         else:
             nsiscript=nsiscript.replace('@2to3@',';')   
 
+        if self.msvc2005:
+            nsiscript=nsiscript.replace('@msvc2005@','')
+        else:
+            nsiscript=nsiscript.replace('@msvc2005@',';')   
+
+        if self.msvc2005sp1:
+            nsiscript=nsiscript.replace('@msvc2005sp1@','')
+        else:
+            nsiscript=nsiscript.replace('@msvc2005sp1@',';')   
+
+        if self.msvc2008:
+            nsiscript=nsiscript.replace('@msvc2008@','')
+        else:
+            nsiscript=nsiscript.replace('@msvc2008@',';')   
+
+        if self.msvc2008sp1:
+            nsiscript=nsiscript.replace('@msvc2008sp1@','')
+        else:
+            nsiscript=nsiscript.replace('@msvc2008sp1@',';')   
+
         # icon files
         # XXX todo: make icons configurable
         nsiscript = nsiscript.replace(
@@ -431,7 +464,12 @@ def get_nsi(pythonversions=None):
 @compile@!define MISC_COMPILE "1"
 @optimize@!define MISC_OPTIMIZE "1"
 @2to3@!define MISC_2TO3 "1"
+@msvc2005@!define MISC_MSVC2005 "1"
+@msvc2005sp1@!define MISC_MSVC2005SP1 "1"
+@msvc2008@!define MISC_MSVC2008 "1"
+@msvc2008sp1@!define MISC_MSVC2008SP1 "1"
 @hasurl@BrandingText "@url@"
+
 
 
 ; Various Settings
@@ -486,6 +524,8 @@ ShowUnInstDetails show
 !insertmacro MUI_UNPAGE_FINISH
 
 !define MUI_COMPONENTSPAGE_NODESC
+
+
 
 ; Languages
 ; =========
@@ -553,12 +593,16 @@ ShowUnInstDetails show
   
 !insertmacro MUI_RESERVEFILE_LANGDLL
 
+
+
 ; Core
 ; ====
 
 Section "Core" Core
     SectionIn RO
 SectionEnd
+
+
 
 ; Macros
 ; ======
@@ -780,6 +824,116 @@ SectionEnd
 
 
 
+!include "FileFunc.nsh"
+!include "WordFunc.nsh"
+
+!insertmacro Locate
+!insertmacro VersionCompare
+
+; taken from http://nsis.sourceforge.net/Open_link_in_new_browser_window
+# uses $0
+Function openLinkNewWindow
+  Push $3 
+  Push $2
+  Push $1
+  Push $0
+  ReadRegStr $0 HKCR "http\shell\open\command" ""
+# Get browser path
+    DetailPrint $0
+  StrCpy $2 '"'
+  StrCpy $1 $0 1
+  StrCmp $1 $2 +2 # if path is not enclosed in " look for space as final char
+    StrCpy $2 ' '
+  StrCpy $3 1
+  loop:
+    StrCpy $1 $0 1 $3
+    DetailPrint $1
+    StrCmp $1 $2 found
+    StrCmp $1 "" found
+    IntOp $3 $3 + 1
+    Goto loop
+ 
+  found:
+    StrCpy $1 $0 $3
+    StrCmp $2 " " +2
+      StrCpy $1 '$1"'
+ 
+  Pop $0
+  Exec '$1 $0'
+  Pop $1
+  Pop $2
+  Pop $3
+FunctionEnd
+
+!macro SearchDLL DLLLABEL DLLDESC DLLFILE DLLVERSION DLLLINK
+Var DLLFound${DLLLABEL}
+
+Function Download${DLLLABEL}
+  Push ${DLLLINK}
+  MessageBox MB_OK "You will need to download ${DLLDESC}. Pressing OK will take you to the download page, please follow the instructions on the page that appears."
+  StrCpy $0 ${DLLLINK}
+  Call openLinkNewWindow
+FunctionEnd
+
+Function LocateCallback${DLLLABEL}
+  MoreInfo::GetProductVersion "$R9"
+  Pop $0
+
+  ${VersionCompare} "$0" "${DLLVERSION}" $R1
+
+  ; $R1 contains the result of the comparison
+  ; 0 = versions are equal
+  ; 1 = first version is newer than second version
+  ; 2 = first version is older than second version
+  StrCmp $R1 2 0 found
+
+  ; version $0 is older than ${DLLVERSION}
+  ;DEBUG;MessageBox MB_OK "${DLLFILE} ($0) is too old."
+  Push "$0"
+  GoTo notfound
+
+found:
+  ; version $0 is equal or newer than ${DLLVERSION}
+  ;DEBUG;MessageBox MB_OK "${DLLFILE} ($0) located!"
+  StrCpy "$0" StopLocate
+  StrCpy $DLLFound${DLLLABEL} "true"
+  Push "$0"
+notfound:
+FunctionEnd
+
+Function Find${DLLLABEL}
+  Push $0
+  Push $1
+
+  DetailPrint "Locating ${DLLDESC}: ${DLLFILE} (${DLLVERSION})."
+
+  StrCpy $1 $WINDIR
+  StrCpy $DLLFound${DLLLABEL} "false"
+  ${Locate} "$1" "/L=F /M=${DLLFILE} /S=0B" "LocateCallback${DLLLABEL}"
+  StrCmp $DLLFound${DLLLABEL} "false" 0 +2
+    Call Download${DLLLABEL}
+
+  Pop $1
+  Pop $0
+FunctionEnd
+!macroend
+
+
+!ifdef MISC_MSVC2005
+!insertmacro SearchDLL "MSVC2005" "Microsoft Visual C++ 2005 Redistributable Package" "MSVCR80.DLL" "8.0.50727.42" "http://www.microsoft.com/downloads/details.aspx?familyid=32bc1bee-a3f9-4c13-9c99-220b62a191ee&displaylang=en"
+!endif
+
+!ifdef MISC_MSVC2005SP1
+!insertmacro SearchDLL "MSVC2005SP1" "Microsoft Visual C++ 2005 SP1 Redistributable Package" "MSVCR80.DLL" "8.0.50727.762" "http://www.microsoft.com/downloads/details.aspx?familyid=200b2fd9-ae1a-4a14-984d-389c36f85647&displaylang=en"
+!endif
+
+!ifdef MISC_MSVC2008
+!insertmacro SearchDLL "MSVC2008" "Microsoft Visual C++ 2008 Redistributable Package" "MSVCR90.DLL" "9.0.21022.8" "http://www.microsoft.com/downloads/details.aspx?FamilyID=9b2da534-3e03-4391-8a4d-074b9f2bc1bf&DisplayLang=en"
+!endif
+
+!ifdef MISC_MSVC2008SP1
+!insertmacro SearchDLL "MSVC2008SP1" "Microsoft Visual C++ 2008 SP1 Redistributable Package" "MSVCR90.DLL" "9.0.30729.1" "http://www.microsoft.com/downloads/details.aspx?familyid=A5C84275-3B97-4AB7-A40D-3802B2AF5FC2&displaylang=en"
+!endif
 """
 
     NSI_FOOTER = """
@@ -846,6 +1000,22 @@ Section -Post
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+
+!ifdef MISC_MSVC2005
+  Call FindMSVC2005
+!endif
+
+!ifdef MISC_MSVC2005SP1
+  Call FindMSVC2005SP1
+!endif
+
+!ifdef MISC_MSVC2008
+  Call FindMSVC2008
+!endif
+
+!ifdef MISC_MSVC2008SP1
+  Call FindMSVC2008SP1
+!endif
 SectionEnd
 
 Section un.Post
