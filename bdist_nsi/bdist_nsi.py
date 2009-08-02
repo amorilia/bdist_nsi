@@ -502,6 +502,11 @@ SectionEnd
 ; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
 ; $1 = python executable (typically, python.exe)
 !macro InstallFiles PYTHONVERSION
+
+  ; first remove any stray files leftover from a previous installation
+  !insertmacro UninstallFiles
+
+  ; now install all files
 @_files@
 !macroend
 
