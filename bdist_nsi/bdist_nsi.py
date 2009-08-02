@@ -62,6 +62,8 @@ class bdist_nsi(Command):
                      "check if msvc 2008 redistributable package is installed"),
                     ('msvc2008sp1', None,
                      "check if msvc 2008 sp1 redistributable package is installed"),
+                    ('nshextra=', None,
+                     "additional nsis header file to include at the start of the file, and which must define the following macros (they can be empty if not used): InstallFilesExtra, UninstallFilesExtra, PostExtra, and UnPostExtra"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
@@ -86,6 +88,7 @@ class bdist_nsi(Command):
         self.msvc2005sp1 = 0
         self.msvc2008 = 0
         self.msvc2008sp1 = 0
+        self.nshextra = None
 
     # initialize_options()
 
@@ -148,6 +151,9 @@ class bdist_nsi(Command):
                                        "python-install-164x314.bmp")
         else:
             self.bitmap = os.path.abspath(self.bitmap)
+
+        if self.nshextra:
+            self.nshextra = os.path.abspath(self.nshextra)
 
         self.set_undefined_options('bdist',
                                    ('dist_dir', 'dist_dir'),
@@ -394,6 +400,12 @@ class bdist_nsi(Command):
         else:
             nsiscript=nsiscript.replace('@msvc2008sp1@',';')   
 
+        if self.nshextra:
+            nsiscript=nsiscript.replace('@hasnshextra@','')
+            nsiscript=nsiscript.replace('@nshextra@', self.nshextra)
+        else:
+            nsiscript=nsiscript.replace('@hasnshextra@',';')   
+
         # icon files
         # XXX todo: make icons configurable
         nsiscript = nsiscript.replace(
@@ -469,6 +481,16 @@ def get_nsi(pythonversions=None):
 @msvc2008@!define MISC_MSVC2008 "1"
 @msvc2008sp1@!define MISC_MSVC2008SP1 "1"
 @hasurl@BrandingText "@url@"
+@hasnshextra@!define MISC_NSHEXTRA "1"
+
+
+
+; Extra header
+; ============
+
+!ifdef MISC_NSHEXTRA
+!include "@nshextra@"
+!endif
 
 
 
