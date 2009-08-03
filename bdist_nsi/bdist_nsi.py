@@ -9,6 +9,7 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 # June/July 2009: further developed by Amorilia
 
 import sys, os, string
+import subprocess
 from distutils.core import Command
 from distutils.util import get_platform
 from distutils.dir_util import create_tree, remove_tree
@@ -340,7 +341,7 @@ class bdist_nsi(Command):
         # 2to3
         _f.append('  !ifdef MISC_2TO3\n')
         _f.append('  Push $9\n')
-        _f.append('  StrCpy $9 "${PYTHONVERSION}" 1\n')
+        _f.append('  StrCpy $9 "$2" 1\n')
         _f.append('  StrCmp $9 "3" 0 end2to3\n')
         _f.append('  SetOutPath "$0"\n')
         for root in _froots:
@@ -364,17 +365,42 @@ class bdist_nsi(Command):
         nsiscript=nsiscript.replace('@_files@',''.join(_f))
         nsiscript=nsiscript.replace('@_deletefiles@',''.join(_fd))
         nsiscript=nsiscript.replace('@_deletedirs@',''.join(_d))
-        
+
+        abs_py_dir = os.path.abspath(self.bdist_dir+os.sep+'_python')
         if not self.no_target_compile:
             nsiscript=nsiscript.replace('@compile@','')
+            print(sys.executable +
+                  ' -c "import compileall; compileall.compile_dir(\'%s\')"'
+                  % (abs_py_dir.replace('\\', '\\\\')))
+            # compile folder - for size calculation below
+            subprocess.call([sys.executable,
+                             '-c', 'import compileall; compileall.compile_dir(\'%s\')'
+                             % (abs_py_dir.replace('\\', '\\\\'))])
         else:
             nsiscript=nsiscript.replace('@compile@',';')        
             
         if not self.no_target_optimize:
             nsiscript=nsiscript.replace('@optimize@','')
+            # compile folder - for size calculation below
+            subprocess.call([sys.executable,
+                             '-OO', '-c', 'import compileall; compileall.compile_dir(\'%s\')'
+                             % (abs_py_dir.replace('\\', '\\\\'))])
         else:
-            nsiscript=nsiscript.replace('@optimize@',';')   
+            nsiscript=nsiscript.replace('@optimize@',';')
 
+        # get total size
+        def round4k(x):
+            """Round number up to closest 4k boundary (disk space is allocated
+            in chunks of 4k so this 'fixes' the file size).
+            """
+            return (1 + (x // 4096)) * 4096
+        pysize = sum(
+            sum(round4k(os.path.getsize(os.path.join(dirpath, filename)))
+                for filename in filenames)
+            for dirpath, dirnames, filenames
+            in os.walk(self.bdist_dir+os.sep+'_python'))
+        nsiscript=nsiscript.replace('@pysizekb@', str(1 + (pysize // 1000)))
+        
         if self.run2to3:
             nsiscript=nsiscript.replace('@2to3@','')
         else:
@@ -422,7 +448,7 @@ class bdist_nsi(Command):
         self.compile()
         
                 
-            
+
     def visit(self,arg,dir,fil):
         for each in fil:
             if not os.path.isdir(dir+os.sep+each):
@@ -473,6 +499,7 @@ def get_nsi(pythonversions=None):
 !define PRODUCT_WEB_SITE "@url@"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
+!define MISC_PYSIZEKB "@pysizekb@"
 @compile@!define MISC_COMPILE "1"
 @optimize@!define MISC_OPTIMIZE "1"
 @2to3@!define MISC_2TO3 "1"
@@ -631,20 +658,28 @@ SectionEnd
 
 ; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
 ; $1 = python executable (typically, python.exe)
-!macro InstallFiles PYTHONVERSION
+; $2 = python version (e.g. "2.6")
+Function InstallFiles
 
   ; first remove any stray files leftover from a previous installation
-  !insertmacro UninstallFiles
+  Call UninstallFiles
 
   ; now install all files
 @_files@
-!macroend
+FunctionEnd
 
 ; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
-!macro UninstallFiles
+; $1 = python executable (typically, python.exe)
+; $2 = python version (e.g. "2.6")
+Function UninstallFiles
 @_deletefiles@
 @_deletedirs@
-!macroend
+FunctionEnd
+
+Function un.UninstallFiles
+@_deletefiles@
+@_deletedirs@
+FunctionEnd
 
 !macro PythonSection PYTHONVERSION
 
@@ -713,12 +748,14 @@ FunctionEnd
 ; Install the library for Python ${PYTHONVERSION}
 Section "${PYTHONVERSION}" Python${PYTHONVERSION}
     SetShellVarContext all
+    AddSize ${MISC_PYSIZEKB}
 
     StrCmp $PYTHONPATH${PYTHONVERSION} "" python_install_end
 
     StrCpy $0 $PYTHONPATH${PYTHONVERSION}
     StrCpy $1 "python.exe"
-    !insertmacro InstallFiles ${PYTHONVERSION}
+    StrCpy $2 "${PYTHONVERSION}"
+    Call InstallFiles
 
 python_install_end:
 
@@ -734,7 +771,9 @@ Section un.Python${PYTHONVERSION}
     StrCmp $PYTHONPATH${PYTHONVERSION} "" python_uninstall_end
 
     StrCpy $0 $PYTHONPATH${PYTHONVERSION}
-    !insertmacro UninstallFiles
+    StrCpy $1 "python.exe"
+    StrCpy $2 "${PYTHONVERSION}"
+    Call un.UninstallFiles
 
 python_uninstall_end:
 
@@ -815,12 +854,14 @@ FunctionEnd
 ; Install the library for Maya ${MAYAVERSION}
 Section "${MAYAVERSION}" Maya${MAYAVERSION}
     SetShellVarContext all
+    AddSize ${MISC_PYSIZEKB}
 
     StrCmp $MAYAPATH${MAYAVERSION} "" maya_install_end
 
     StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
     StrCpy $1 "..\\bin\mayapy.exe"
-    !insertmacro InstallFiles ${PYTHONVERSION}
+    StrCpy $2 "2.5" ; XXX include in macro
+    Call InstallFiles
 
 maya_install_end:
 
@@ -836,7 +877,9 @@ Section un.Maya${MAYAVERSION}
     StrCmp $MAYAPATH${MAYAVERSION} "" maya_uninstall_end
 
     StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
-    !insertmacro UninstallFiles
+    StrCpy $1 "..\\bin\mayapy.exe"
+    StrCpy $2 "2.5" ; XXX include in macro
+    Call un.UninstallFiles
 
 maya_uninstall_end:
 
