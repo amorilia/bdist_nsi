@@ -698,6 +698,8 @@ FunctionEnd
 
 !macro PythonSection PYTHONVERSION
 
+!define HAVE_SECTION_PYTHON${PYTHONVERSION}
+
 ; Set up variable for install path of this python version
 Var PYTHONPATH${PYTHONVERSION}
 
