@@ -290,7 +290,7 @@ class bdist_nsi(Command):
         if self.target_version:
             installer_path = os.path.join(distdir, "%s.win32-py%s.exe" % (self.distribution.get_fullname(), self.target_version))
         else:
-            installer_path = os.path.join(distdir, "%s.win32.exe" % self.distribution.get_fullname())                
+            installer_path = os.path.join(distdir, "%s.win32.exe" % self.distribution.get_fullname())
                 
         nsiscript=nsiscript.replace('@installer_path@',installer_path)
         
@@ -337,7 +337,7 @@ class bdist_nsi(Command):
                 _fd.append('    Delete "$0\\'+each[1]+'\"\n')
         _fd.append('    Delete "$0\\Remove${PRODUCT_NAME}.*"\n')
         _fd.append('    Delete "$0\\${PRODUCT_NAME}-wininst.log"\n')
-        _fd.append('    Delete "$0\\${PRODUCT_NAME}*.*"\n')
+        _fd.append('    Delete "$0\\${PRODUCT_NAME}*.egg-info"\n')
         # 2to3
         _f.append('  !ifdef MISC_2TO3\n')
         _f.append('  Push $9\n')
@@ -432,6 +432,8 @@ class bdist_nsi(Command):
         else:
             nsiscript=nsiscript.replace('@hasnshextra@',';')   
 
+        nsiscript = nsiscript.replace("@srcdir@", os.getcwd())
+
         # icon files
         # XXX todo: make icons configurable
         nsiscript = nsiscript.replace(
@@ -447,7 +449,6 @@ class bdist_nsi(Command):
         nsifile.close()
         self.compile()
         
-                
 
     def visit(self,arg,dir,fil):
         for each in fil:
@@ -499,6 +500,7 @@ def get_nsi(pythonversions=None):
 !define PRODUCT_WEB_SITE "@url@"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
+!define MISC_SRCDIR "@srcdir@"
 !define MISC_PYSIZEKB "@pysizekb@"
 @compile@!define MISC_COMPILE "1"
 @optimize@!define MISC_OPTIMIZE "1"
@@ -656,7 +658,7 @@ SectionEnd
 ; Macros
 ; ======
 
-; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
+; $0 = install path (typically, C:\PythonXX)
 ; $1 = python executable (typically, python.exe)
 ; $2 = python version (e.g. "2.6")
 Function InstallFiles
@@ -672,7 +674,7 @@ Function InstallFiles
   !endif
 FunctionEnd
 
-; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
+; $0 = install path (typically, C:\PythonXX)
 ; $1 = python executable (typically, python.exe)
 ; $2 = python version (e.g. "2.6")
 Function UninstallFiles
