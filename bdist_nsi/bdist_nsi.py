@@ -519,15 +519,6 @@ def get_nsi(pythonversions=None):
 
 
 
-; Extra header
-; ============
-
-!ifdef MISC_NSHEXTRA
-!include "@nshextra@"
-!endif
-
-
-
 ; Various Settings
 ; ================
 
@@ -648,6 +639,15 @@ ShowUnInstDetails show
 ; because this will make your installer start faster.
   
 !insertmacro MUI_RESERVEFILE_LANGDLL
+
+
+
+; Extra header
+; ============
+
+!ifdef MISC_NSHEXTRA
+!include "@nshextra@"
+!endif
 
 
 
