@@ -651,15 +651,6 @@ ShowUnInstDetails show
 
 
 
-; Core
-; ====
-
-Section "Core" Core
-    SectionIn RO
-SectionEnd
-
-
-
 ; Macros
 ; ======
 
