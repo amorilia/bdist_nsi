@@ -666,6 +666,10 @@ Function InstallFiles
 
   ; now install all files
 @_files@
+
+  !ifdef MISC_NSHEXTRA
+  !insertmacro InstallFilesExtra
+  !endif
 FunctionEnd
 
 ; $0 = install path (typically, C:\PythonXX\Lib\site-packages)
@@ -674,11 +678,20 @@ FunctionEnd
 Function UninstallFiles
 @_deletefiles@
 @_deletedirs@
+
+  !ifdef MISC_NSHEXTRA
+  !insertmacro UninstallFilesExtra
+  !endif
 FunctionEnd
 
+; (identical to UninstallFiles, but for uninstaller)
 Function un.UninstallFiles
 @_deletefiles@
 @_deletedirs@
+
+  !ifdef MISC_NSHEXTRA
+  !insertmacro UninstallFilesExtra
+  !endif
 FunctionEnd
 
 !macro PythonSection PYTHONVERSION
@@ -1070,24 +1083,33 @@ Section -Post
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
 
-!ifdef MISC_MSVC2005
+  !ifdef MISC_NSHEXTRA
+  !insertmacro UnPostExtra
+  !insertmacro PostExtra
+  !endif
+
+  !ifdef MISC_MSVC2005
   Call FindMSVC2005
-!endif
+  !endif
 
-!ifdef MISC_MSVC2005SP1
+  !ifdef MISC_MSVC2005SP1
   Call FindMSVC2005SP1
-!endif
+  !endif
 
-!ifdef MISC_MSVC2008
+  !ifdef MISC_MSVC2008
   Call FindMSVC2008
-!endif
+  !endif
 
-!ifdef MISC_MSVC2008SP1
+  !ifdef MISC_MSVC2008SP1
   Call FindMSVC2008SP1
-!endif
+  !endif
 SectionEnd
 
 Section un.Post
+  !ifdef MISC_NSHEXTRA
+  !insertmacro UnPostExtra
+  !endif
+
   Delete "$INSTDIR\\${PRODUCT_NAME}_uninstall.exe"
   RmDir "$INSTDIR"
   DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
