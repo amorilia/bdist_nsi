@@ -65,6 +65,8 @@ class bdist_nsi(Command):
                      "check if msvc 2008 sp1 redistributable package is installed"),
                     ('nshextra=', None,
                      "additional nsis header file to include at the start of the file, and which must define the following macros (they can be empty if not used): InstallFilesExtra, UninstallFilesExtra, PostExtra, and UnPostExtra"),
+                    ('target-versions=', None,
+                     "comma separated list of python versions (only for pure packages)"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
@@ -90,6 +92,7 @@ class bdist_nsi(Command):
         self.msvc2008 = 0
         self.msvc2008sp1 = 0
         self.nshextra = None
+        self.target_versions = None
 
     # initialize_options()
 
@@ -224,6 +227,8 @@ class bdist_nsi(Command):
     def build_nsi(self):
         if self.target_version.upper() not in ["","ANY"]:
             nsiscript = get_nsi(pythonversions=[self.target_version])
+        elif self.target_versions:
+            nsiscript = get_nsi(pythonversions=self.target_versions.split(","))
         else:
             pythonversions = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"]
             if self.run2to3:
