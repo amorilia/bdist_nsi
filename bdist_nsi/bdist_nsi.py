@@ -478,17 +478,23 @@ class bdist_nsi(Command):
 # class bdist_nsi
 
 def get_nsi(pythonversions=None):
-    if "2.5" in pythonversions:
-        # maya versions that come with Python 2.5
-        mayaversions = [
-            ("2008", "2008"),
-            ("2008_x64", "2008-x64"),
-            ("2009", "2009"),
-            ("2009_x64", "2009-x64"),
-            ]
-    else:
-        mayaversions = []
-    
+    # list all maya versions
+    mayaversions = [
+        ("2.5", "2008", "2008"),
+        ("2.5", "2008_x64", "2008-x64"),
+        ("2.5", "2009", "2009"),
+        ("2.5", "2009_x64", "2009-x64"),
+        ("2.6", "2010", "2010"),
+        ("2.6", "2010_x64", "2010-x64"),
+        ]
+
+    # filter maya versions    
+    mayaversions = [
+        (pythonversion, mayaversion, mayaregistry)
+        for pythonversion, mayaversion, mayaregistry in mayaversions
+        if pythonversion in pythonversions
+        ]
+
     NSI_HEADER = """\
 ; @name@ self-installer for Windows
 ; (@name@ - @url@)
@@ -796,7 +802,7 @@ SectionEnd
 
 
 
-!macro MayaSection MAYAVERSION MAYAREGISTRY
+!macro MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
 
 ; Set up variable for install path of this maya version
 Var MAYAPATH${MAYAVERSION}
@@ -873,7 +879,7 @@ Section "${MAYAVERSION}" Maya${MAYAVERSION}
 
     StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
     StrCpy $1 "..\\bin\mayapy.exe"
-    StrCpy $2 "2.5" ; XXX include in macro
+    StrCpy $2 "${PYTHONVERSION}"
     Call InstallFiles
 
 maya_install_end:
@@ -882,7 +888,7 @@ SectionEnd
 
 !macroend
 
-!macro un.MayaSection MAYAVERSION MAYAREGISTRY
+!macro un.MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
 
 Section un.Maya${MAYAVERSION}
     SetShellVarContext all
@@ -891,7 +897,7 @@ Section un.Maya${MAYAVERSION}
 
     StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
     StrCpy $1 "..\\bin\mayapy.exe"
-    StrCpy $2 "2.5" ; XXX include in macro
+    StrCpy $2 "${PYTHONVERSION}"
     Call un.UninstallFiles
 
 maya_uninstall_end:
@@ -1062,7 +1068,7 @@ Function .onInit
     ; python version not found, so disable that section
     SectionSetFlags ${Maya${MAYAVERSION}} ${SF_RO}
 """.replace("${MAYAVERSION}", mayaversion)
-                for mayaversion, mayaregistry in mayaversions) + """
+                for pythonversion, mayaversion, mayaregistry in mayaversions) + """
 
 FunctionEnd
 
@@ -1070,7 +1076,7 @@ Function un.onInit
 """ + "\n".join("  Call un.GetPythonPath%s" % pythonversion
                  for pythonversion in pythonversions) + """
 """ + "\n".join("  Call un.GetMayaPath%s" % mayaversion
-                 for mayaversion, mayaregistry in mayaversions) + """
+                 for pythonversion, mayaversion, mayaregistry in mayaversions) + """
 """ + """
 FunctionEnd
 
@@ -1129,12 +1135,14 @@ SectionEnd
             + "\nSectionGroupEnd\n\n"
             + "\nSectionGroup /e Maya\n"
             + "\n".join(
-                "!insertmacro MayaSection %s %s" % (mayaversion, mayaregistry)
-                for mayaversion, mayaregistry in mayaversions)
+                "!insertmacro MayaSection %s %s %s"
+                % (pythonversion, mayaversion, mayaregistry)
+                for pythonversion, mayaversion, mayaregistry in mayaversions)
             + "\nSectionGroupEnd\n\n"
             + "\nSectionGroup /e un.Maya\n"
             + "\n".join(
-                "!insertmacro un.MayaSection %s %s" % (mayaversion, mayaregistry)
-                for mayaversion, mayaregistry in mayaversions)
+                "!insertmacro un.MayaSection %s %s %s"
+                % (pythonversion, mayaversion, mayaregistry)
+                for pythonversion, mayaversion, mayaregistry in mayaversions)
             + "\nSectionGroupEnd\n\n"
             + NSI_FOOTER)
