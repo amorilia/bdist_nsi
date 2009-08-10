@@ -67,11 +67,15 @@ class bdist_nsi(Command):
                      "additional nsis header file to include at the start of the file, and which must define the following macros (they can be empty if not used): InstallFilesExtra, UninstallFilesExtra, PostExtra, and UnPostExtra"),
                     ('target-versions=', None,
                      "comma separated list of python versions (only for pure packages)"),
+                    ('maya', None,
+                     "include (compatible) Maya targets in installer"),
+                    ('blender', None,
+                     "include (compatible) Blender targets in installer"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
                        'skip-build', 'run2to3', 'msvc2005', 'msvc2005sp1',
-                       'msvc2008', 'msvc2008sp1']
+                       'msvc2008', 'msvc2008sp1', 'maya', 'blender']
 
     def initialize_options (self):
         self.bdist_dir = None
@@ -93,6 +97,8 @@ class bdist_nsi(Command):
         self.msvc2008sp1 = 0
         self.nshextra = None
         self.target_versions = None
+        self.maya = 0
+        self.blender = 0
 
     # initialize_options()
 
@@ -437,6 +443,16 @@ class bdist_nsi(Command):
         else:
             nsiscript=nsiscript.replace('@hasnshextra@',';')   
 
+        if self.maya:
+            nsiscript=nsiscript.replace('@maya@','')
+        else:
+            nsiscript=nsiscript.replace('@maya@',';')   
+
+        if self.blender:
+            nsiscript=nsiscript.replace('@blender@','')
+        else:
+            nsiscript=nsiscript.replace('@blender@',';')   
+
         nsiscript = nsiscript.replace("@srcdir@", os.getcwd())
 
         # icon files
@@ -520,6 +536,8 @@ def get_nsi(pythonversions=None):
 @msvc2005sp1@!define MISC_MSVC2005SP1 "1"
 @msvc2008@!define MISC_MSVC2008 "1"
 @msvc2008sp1@!define MISC_MSVC2008SP1 "1"
+@maya@!define MISC_MAYA "1"
+@blender@!define MISC_BLENDER "1"
 @hasurl@BrandingText "@url@"
 @hasnshextra@!define MISC_NSHEXTRA "1"
 
@@ -802,6 +820,8 @@ SectionEnd
 
 
 
+!ifdef MISC_MAYA
+
 !macro MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
 
 ; Set up variable for install path of this maya version
@@ -905,6 +925,8 @@ maya_uninstall_end:
 SectionEnd
 
 !macroend
+
+!endif ;MISC_MAYA
 
 
 
@@ -1054,30 +1076,38 @@ Function .onInit
 
   ; check python versions
 """ + "\n".join("""\
-    Call GetPythonPath${PYTHONVERSION}
-    StrCmp $PYTHONPATH${PYTHONVERSION} "" 0 +2
-    ; python version not found, so disable that section
-    SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
+  Call GetPythonPath${PYTHONVERSION}
+  StrCmp $PYTHONPATH${PYTHONVERSION} "" 0 +2
+  ; python version not found, so disable that section
+  SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
 """.replace("${PYTHONVERSION}", pythonversion)
                 for pythonversion in pythonversions) + """
 
   ; check maya versions
+
+  !ifdef MISC_MAYA
+
 """ + "\n".join("""\
-    Call GetMayaPath${MAYAVERSION}
-    StrCmp $MAYAPATH${MAYAVERSION} "" 0 +2
-    ; python version not found, so disable that section
-    SectionSetFlags ${Maya${MAYAVERSION}} ${SF_RO}
+  Call GetMayaPath${MAYAVERSION}
+  StrCmp $MAYAPATH${MAYAVERSION} "" 0 +2
+  ; python version not found, so disable that section
+  SectionSetFlags ${Maya${MAYAVERSION}} ${SF_RO}
 """.replace("${MAYAVERSION}", mayaversion)
                 for pythonversion, mayaversion, mayaregistry in mayaversions) + """
+  !endif ;MISC_MAYA
 
 FunctionEnd
 
 Function un.onInit
 """ + "\n".join("  Call un.GetPythonPath%s" % pythonversion
                  for pythonversion in pythonversions) + """
+
+  !ifdef MISC_MAYA
+
 """ + "\n".join("  Call un.GetMayaPath%s" % mayaversion
                  for pythonversion, mayaversion, mayaregistry in mayaversions) + """
 """ + """
+  !endif ;MISC_MAYA
 FunctionEnd
 
 Section -Post
@@ -1132,7 +1162,8 @@ SectionEnd
             + "\n".join(
                 "!insertmacro un.PythonSection %s" % pythonversion
                 for pythonversion in pythonversions)
-            + "\nSectionGroupEnd\n\n"
+            + "\nSectionGroupEnd\n\n\n"
+            + "!ifdef MISC_MAYA\n"
             + "\nSectionGroup /e Maya\n"
             + "\n".join(
                 "!insertmacro MayaSection %s %s %s"
@@ -1145,4 +1176,5 @@ SectionEnd
                 % (pythonversion, mayaversion, mayaregistry)
                 for pythonversion, mayaversion, mayaregistry in mayaversions)
             + "\nSectionGroupEnd\n\n"
+            + "!endif ;MISC_MAYA\n\n"
             + NSI_FOOTER)
