@@ -399,7 +399,7 @@ class bdist_nsi(Command):
             _f.append('  StrCmp $9 "3" 0 end_2to3_%s\n' % tag)
             _f.append('  SetOutPath "$0"\n')
             for root in _r:
-                _f.append("""  nsExec::ExecToLog "$1 $\\"$0\\Tools\\Scripts\\2to3.py$\\" -w -n $\\"%s$\\""\n""" % root)
+                _f.append("""  nsExec::ExecToLog "$1 $\\"$0\\Tools\\Scripts\\2to3.py$\\" -w -n $\\"%s$\\""\n""" % root.rstrip("\\"))
             _f.append('end_2to3_%s:\n' % tag)
             _f.append('  Pop $9\n')
             _f.append('  !endif\n')
