@@ -862,9 +862,8 @@ SectionEnd
 ; Set up variable for install path of this python version
 Var PYTHONPATH${PYTHONVERSION}
 !insertmacro GetPythonPath ${PYTHONVERSION} ""
-!insertmacro PythonSectionDef ${PYTHONVERSION} ""
-; cannot define this in an uninstall section group, hence goes here
 !insertmacro GetPythonPath ${PYTHONVERSION} "un."
+!insertmacro PythonSectionDef ${PYTHONVERSION} ""
 !macroend
 
 !macro un.PythonSection PYTHONVERSION
@@ -875,13 +874,9 @@ Var PYTHONPATH${PYTHONVERSION}
 
 !ifdef MISC_MAYA
 
-!macro MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
-
-; Set up variable for install path of this maya version
-Var MAYAPATH${MAYAVERSION}
-
+!macro GetMayaPath PYTHONVERSION MAYAVERSION MAYAREGISTRY un
 ; Function to detect the maya path
-Function GetMayaPath${MAYAVERSION}
+Function ${un}GetMayaPath${MAYAVERSION}
     ClearErrors
 
     ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
@@ -912,39 +907,11 @@ maya_not_found:
 maya_path_done:
 
 FunctionEnd
+!macroend ;GetMayaPath
 
-; Function to detect the maya path on uninstall
-Function un.GetMayaPath${MAYAVERSION}
-    ClearErrors
-
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
-    IfErrors 0 maya_registry_found
-
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
-    IfErrors 0 maya_registry_found
-
-    Goto maya_not_found
-
-maya_registry_found:
-
-    ; remove trailing backslash using the $EXEDIR trick
-    Push $MAYAPATH${MAYAVERSION}
-    Exch $EXEDIR
-    Exch $EXEDIR
-    Pop $MAYAPATH${MAYAVERSION}
-
-    Goto maya_path_done
-
-maya_not_found:
-
-    StrCpy $MAYAPATH${MAYAVERSION} ""
-
-maya_path_done:
-
-FunctionEnd
-
+!macro MayaSectionDef PYTHONVERSION MAYAVERSION MAYAREGISTRY un
 ; Install the library for Maya ${MAYAVERSION}
-Section "${MAYAVERSION}" Maya${MAYAVERSION}
+Section ${un}"${MAYAVERSION}" ${un}Maya${MAYAVERSION}
     SetShellVarContext all
 
     StrCmp $MAYAPATH${MAYAVERSION} "" maya_install_end
@@ -956,34 +923,22 @@ Section "${MAYAVERSION}" Maya${MAYAVERSION}
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
 
-    Call InstallFiles
+    Call ${un}InstallFiles
 
 maya_install_end:
 
 SectionEnd
+!macroend ;MayaSectionDef
 
+!macro MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
+Var MAYAPATH${MAYAVERSION}
+!insertmacro GetMayaPath ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} ""
+!insertmacro GetMayaPath ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} "un."
+!insertmacro MayaSectionDef ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} ""
 !macroend
 
 !macro un.MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
-
-Section un.Maya${MAYAVERSION}
-    SetShellVarContext all
-
-    StrCmp $MAYAPATH${MAYAVERSION} "" maya_uninstall_end
-
-    StrCpy $0 "$MAYAPATH${MAYAVERSION}\\Python"
-    StrCpy $1 "$MAYAPATH${MAYAVERSION}\\bin\\mayapy.exe"
-    StrCpy $2 "${PYTHONVERSION}"
-    StrCpy $3 "$MAYAPATH${MAYAVERSION}\\Python\\Lib\\site-packages"
-    StrCpy $4 "" ; no scripts
-    StrCpy $5 "" ; no headers
-
-    Call un.InstallFiles
-
-maya_uninstall_end:
-
-SectionEnd
-
+!insertmacro MayaSectionDef ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} "un."
 !macroend
 
 !endif ;MISC_MAYA
@@ -1085,17 +1040,9 @@ blender_scripts_done:
 FunctionEnd
 !macroend
 
-!macro BlenderSection
-
-; Set up variable for install path of Blender
-Var BLENDERHOME    ; blender settings location
-Var BLENDERSCRIPTS ; blender scripts location ($BLENDERHOME/.blender/scripts)
-Var BLENDERINST    ; blender.exe location
-
-!insertmacro GetBlenderPath ""
-
+!macro BlenderSectionDef un
 ; Install the library for Blender 
-Section Blender Blender
+Section ${un}Blender ${un}Blender
     SetShellVarContext all
 
     StrCmp $BLENDERSCRIPTS "" blender_install_end
@@ -1106,35 +1053,24 @@ Section Blender Blender
     StrCpy $3 "$BLENDERSCRIPTS\\bpymodules"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
-    Call InstallFiles
+    Call ${un}InstallFiles
 
 blender_install_end:
 
 SectionEnd
+!macroend ;BlenderSectionDef
 
+!macro BlenderSection
+Var BLENDERHOME    ; blender settings location
+Var BLENDERSCRIPTS ; blender scripts location ($BLENDERHOME/.blender/scripts)
+Var BLENDERINST    ; blender.exe location
+!insertmacro GetBlenderPath ""
+!insertmacro BlenderSectionDef ""
 !macroend ;BlenderSection
 
 !macro un.BlenderSection
-
 !insertmacro GetBlenderPath "un."
-
-Section un.Blender
-    SetShellVarContext all
-
-    StrCmp $BLENDERSCRIPTS "" blender_uninstall_end
-
-    StrCpy $0 "" ; XXX todo: set python path
-    StrCpy $1 "" ; XXX todo: set python executable
-    StrCpy $2 "" ; XXX todo: set python version
-    StrCpy $3 "$BLENDERSCRIPTS\\bpymodules"
-    StrCpy $4 "" ; no scripts
-    StrCpy $5 "" ; no headers
-    Call un.InstallFiles
-
-blender_uninstall_end:
-
-SectionEnd
-
+!insertmacro BlenderSectionDef "un."
 !macroend ;un.BlenderSection
 
 !endif ;MISC_BLENDER
