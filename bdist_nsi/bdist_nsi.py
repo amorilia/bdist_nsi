@@ -315,67 +315,157 @@ class bdist_nsi(Command):
         files=[]
         
         os.path.walk(self.bdist_dir+os.sep+'_python',self.visit,files)
-        
-        _f=[]
-        _d=[]
-        _fd=[]
-        _fc=[]
-        _froots=[]
+
+        # install folders and files (as nsis commands)
+        _f_packages=[]
+        _f_scripts=[]
+        _f_include=[]
+        # delete files (as nsis commands)
+        _d_packages=[]
+        _d_scripts=[]
+        _d_include=[]
+        # folders for recursive delete (as strings, for compiling and cleaning)
+        _r_packages=[]
+        _r_scripts=[]
+        _r_include=[]
         lastdir=""
         for each in files:
             # skip egg info files
             if each[1].endswith(".egg-info"):
                 continue
+            if each[1].lower().startswith("lib\\site-packages\\"):
+                outpath = "$3\\%s" % each[0][18:]
+                outfile = "$3\\%s" % each[1][18:]
+                _f = _f_packages
+                _d = _d_packages
+                _r = _r_packages
+            elif each[1].lower().startswith("scripts\\"):
+                outpath = "$4\\%s" % each[0][8:]
+                outfile = "$4\\%s" % each[1][8:]
+                _f = _f_scripts
+                _d = _d_scripts
+                _r = _r_scripts
+            elif each[1].lower().startswith("include\\"):
+                outpath = "$5\\%s" % each[0][8:]
+                outfile = "$5\\%s" % each[1][8:]
+                _f = _f_include
+                _d = _d_include
+                _r = _r_include
+            else:
+                log.warn("warning: ignoring %s" % each[1])
+                continue
+
+            # find root directories and root files
+            components = outfile.split("\\")
+            # components[1] can be empty in case of e.g. "$4\\"
+            if len(components) >= 2 and components[1]:
+                root = "\\".join(components[:2])
+                if len(components) >= 3:
+                    root = root + "\\" # folder!
+                if root not in _r:
+                    _r.append(root)
+
             if lastdir != each[0]:
-                _f.append('  SetOutPath "$0\%s"\n' % each[0])
                 lastdir=each[0]
-                if each[0] not in ['Lib\\site-packages','Scripts','Include','']:
-                    #_d.insert(0,'    RMDir "$0\\'+each[0]+'\"\n')
-                    # find root directories of modules
-                    if each[0].startswith("Lib\\site-packages\\"):
-                        root = "\\".join(each[0].split("\\")[:3])
-                        if root not in _froots:
-                            _froots.append(root)
-                            _d.append('    RMDir /r "$0\\%s"\n' % root)
+                _f.append('  SetOutPath "%s"\n' % outpath)
             _f.append('  File "_python\\'+each[1]+'\"\n')
-            
-            if (each[1][len(each[1])-3:].lower() == ".py"):
-                _fc.append('"'+each[1]+'",\n')
-                if each[0].lower() == "scripts":
-                    _fd.append('    Delete "$0\\'+each[1]+'o'+'\"\n')
-                    _fd.append('    Delete "$0\\'+each[1]+'c'+'\"\n')
-            if each[0].lower() == "scripts":
-                _fd.append('    Delete "$0\\'+each[1]+'\"\n')
-        _fd.append('    Delete "$0\\Remove${PRODUCT_NAME}.*"\n')
-        _fd.append('    Delete "$0\\${PRODUCT_NAME}-wininst.log"\n')
-        _fd.append('    Delete "$0\\${PRODUCT_NAME}*.egg-info"\n')
-        # 2to3
-        _f.append('  !ifdef MISC_2TO3\n')
-        _f.append('  Push $9\n')
-        _f.append('  StrCpy $9 "$2" 1\n')
-        _f.append('  StrCmp $9 "3" 0 end2to3\n')
-        _f.append('  SetOutPath "$0"\n')
-        for root in _froots:
-            _f.append("""  nsExec::ExecToLog "$0\\$1 $\\"$0\\Tools\\Scripts\\2to3.py$\\" -w -n $\\"$0\\%s$\\""\n""" % root)
-        _f.append('end2to3:\n')
-        _f.append('  Pop $9\n')
-        _f.append('  !endif\n')
-        # compile modules
-        _f.append('  !ifdef MISC_COMPILE\n')
-        _f.append('  SetOutPath "$0"\n')
-        _f.append("""  nsExec::ExecToLog "$0\$1 -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
-        for root in _froots:
-            _f.append("""  nsExec::ExecToLog "$0\$1 -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
-        _f.append('  !endif\n')
-        _f.append('  !ifdef MISC_OPTIMIZE\n')
-        _f.append('  SetOutPath "$0"\n')
-        _f.append("""  nsExec::ExecToLog "$0\$1 -OO -c $\\"import compileall; compileall.compile_dir('Scripts')$\\""\n""")
-        for root in _froots:
-            _f.append("""  nsExec::ExecToLog "$0\$1 -OO -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
-        _f.append('  !endif\n')
+            _d.append('  Delete "%s"\n' % outfile)
+            if outfile.lower().endswith(".py"):
+                _d.append('  Delete "%so"\n' % outfile)
+                _d.append('  Delete "%sc"\n' % outfile)
+
+        # remove folders
+        for _d, _r, tag in zip([_d_packages, _d_scripts, _d_include],
+                               [_r_packages, _r_scripts, _r_include],
+                               ['packages', 'scripts', 'include']):
+            print _r
+            _d.append('  ; cleaning folders\n')
+            for root in _r:
+                if root.endswith("\\"):
+                    _d.append('  RmDir /r "%s"\n' % root)
+
+        # 2to3, compile, optimize
+        for _f, _r, tag in zip([_f_packages, _f_scripts],
+                               [_r_packages, _r_scripts],
+                               ['packages', 'scripts']):
+            if not _r:
+                continue
+            # 2to3
+            _f.append('  !ifdef MISC_2TO3\n')
+            _f.append('  Push $9\n')
+            _f.append('  StrCmp $0 "" end_2to3_%s 0 ; only run if we have a full python install\n' % tag)
+            _f.append('  StrCmp $1 "" end_2to3_%s 0 ; only run if we have an executable\n' % tag)
+            _f.append('  StrCpy $9 "$2" 1\n')
+            _f.append('  StrCmp $9 "3" 0 end_2to3_%s\n' % tag)
+            _f.append('  SetOutPath "$0"\n')
+            for root in _r:
+                _f.append("""  nsExec::ExecToLog "$1 $\\"$0\\Tools\\Scripts\\2to3.py$\\" -w -n $\\"%s$\\""\n""" % root)
+            _f.append('end_2to3_%s:\n' % tag)
+            _f.append('  Pop $9\n')
+            _f.append('  !endif\n')
+            # compile modules
+            _f.append('  !ifdef MISC_COMPILE\n')
+            _f.append('  StrCmp $0 "" end_compile_%s 0 ; only run if we have a full python install\n' % tag)
+            _f.append('  StrCmp $1 "" end_compile_%s 0 ; only run if we have an executable\n' % tag)
+            _f.append('  SetOutPath "$0"\n')
+            for root in _r:
+                if root.endswith("\\"):
+                    _f.append("""  nsExec::ExecToLog "$1 -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+                else:
+                    _f.append("""  nsExec::ExecToLog "$1 -c $\\"import py_compile; py_compile.compile('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+            _f.append('end_compile_%s:\n' % tag)
+            _f.append('  !endif\n')
+            _f.append('  !ifdef MISC_OPTIMIZE\n')
+            _f.append('  StrCmp $0 "" end_optimize_%s 0 ; only run if we have a full python install\n' % tag)
+            _f.append('  StrCmp $1 "" end_optimize_%s 0 ; only run if we have an executable\n' % tag)
+            _f.append('  SetOutPath "$0"\n')
+            for root in _r:
+                if root.endswith("\\"):
+                    _f.append("""  nsExec::ExecToLog "$1 -OO -c $\\"import compileall; compileall.compile_dir('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+                else:
+                    _f.append("""  nsExec::ExecToLog "$1 -OO -c $\\"import py_compile; py_compile.compile('%s')$\\""\n""" % root.replace("\\", "\\\\"))
+            _f.append('end_optimize_%s:\n' % tag)
+            _f.append('  !endif\n')
+
+        _f = []
+
+        _f.append('  ; packages\n')
+        _f.append('  StrCmp $3 "" end_packages 0\n')
+        _f += _f_packages
+        _f.append('end_packages:\n\n')
+        _f.append('  ; scripts\n')
+        _f.append('  StrCmp $4 "" end_scripts 0\n')
+        _f += _f_scripts
+        _f.append('end_scripts:\n\n')
+        _f.append('  ; headers\n')
+        _f.append('  StrCmp $5 "" end_include 0\n')
+        _f += _f_include
+        _f.append('end_include:\n\n')
+
+        _d = []
+
+        _d.append('  ; packages\n')
+        _d.append('  StrCmp $3 "" end_clean_packages 0\n')
+        _d += _d_packages
+        _d.append('  Delete "$3\\${PRODUCT_NAME}*.egg-info"\n')
+        _d.append('end_clean_packages:\n\n')
+        _d.append('  ; scripts\n')
+        _d.append('  StrCmp $4 "" end_clean_scripts 0\n')
+        _d += _d_scripts
+        _d.append('end_clean_scripts:\n\n')
+        _d.append('  ; headers\n')
+        _d.append('  StrCmp $5 "" end_clean_include 0\n')
+        _d += _d_include
+        _d.append('end_clean_include:\n\n')
+
+        _d.append('  ; remove clutter\n')
+        _d.append('  StrCmp $0 "" end_clean_clutter 0\n')
+        _d.append('  Delete "$0\\Remove${PRODUCT_NAME}.*"\n')
+        _d.append('  Delete "$0\\${PRODUCT_NAME}-wininst.log"\n')
+        _d.append('end_clean_clutter:\n\n')
+
         nsiscript=nsiscript.replace('@_files@',''.join(_f))
-        nsiscript=nsiscript.replace('@_deletefiles@',''.join(_fd))
-        nsiscript=nsiscript.replace('@_deletedirs@',''.join(_d))
+        nsiscript=nsiscript.replace('@_deletefiles@',''.join(_d))
 
         abs_py_dir = os.path.abspath(self.bdist_dir+os.sep+'_python')
         if not self.no_target_compile:
@@ -675,16 +765,23 @@ ShowUnInstDetails show
 
 
 
-; Macros
-; ======
+; Install and uninstall functions
+; ===============================
 
-; $0 = install path (typically, C:\PythonXX)
-; $1 = python executable (typically, python.exe)
+; $0 = full path to python directory (typically, C:\PythonXX)
+; $1 = full path to python executable (typically, C:\PythonXX\python.exe; if empty then compile/optimize/2to3 will be disabled)
 ; $2 = python version (e.g. "2.6")
+; $3 = full path to python package directory (typically, C:\PythonXX\Lib\site-packages)
+; $4 = full path to python scripts directory (if empty, not installed)
+; $5 = full path to python include directory (if empty, not installed)
 Function InstallFiles
 
   ; first remove any stray files leftover from a previous installation
-  Call UninstallFiles
+@_deletefiles@
+
+  !ifdef MISC_NSHEXTRA
+  !insertmacro UninstallFilesExtra
+  !endif
 
   ; now install all files
 @_files@
@@ -694,37 +791,22 @@ Function InstallFiles
   !endif
 FunctionEnd
 
-; $0 = install path (typically, C:\PythonXX)
-; $1 = python executable (typically, python.exe)
-; $2 = python version (e.g. "2.6")
-Function UninstallFiles
+Function un.InstallFiles
 @_deletefiles@
-@_deletedirs@
 
   !ifdef MISC_NSHEXTRA
   !insertmacro UninstallFilesExtra
   !endif
 FunctionEnd
 
-; (identical to UninstallFiles, but for uninstaller)
-Function un.UninstallFiles
-@_deletefiles@
-@_deletedirs@
 
-  !ifdef MISC_NSHEXTRA
-  !insertmacro UninstallFilesExtra
-  !endif
-FunctionEnd
 
-!macro PythonSection PYTHONVERSION
+; Macros
+; ======
 
-!define HAVE_SECTION_PYTHON${PYTHONVERSION}
-
-; Set up variable for install path of this python version
-Var PYTHONPATH${PYTHONVERSION}
-
+!macro GetPythonPath PYTHONVERSION un
 ; Function to detect the python path
-Function GetPythonPath${PYTHONVERSION}
+Function ${un}GetPythonPath${PYTHONVERSION}
     ClearErrors
 
     ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
@@ -753,69 +835,40 @@ python_not_found:
 python_path_done:
 
 FunctionEnd
+!macroend
 
-; Function to detect the python path on uninstall
-Function un.GetPythonPath${PYTHONVERSION}
-    ClearErrors
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors 0 python_registry_found
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors python_not_found python_registry_found
-
-python_registry_found:
-
-    ; remove trailing backslash using the $EXEDIR trick
-    Push $PYTHONPATH${PYTHONVERSION}
-    Exch $EXEDIR
-    Exch $EXEDIR
-    Pop $PYTHONPATH${PYTHONVERSION}
-
-    Goto python_path_done
-
-python_not_found:
-
-    StrCpy $PYTHONPATH${PYTHONVERSION} ""
-
-python_path_done:
-
-FunctionEnd
-
+!macro PythonSectionDef PYTHONVERSION un
 ; Install the library for Python ${PYTHONVERSION}
-Section "${PYTHONVERSION}" Python${PYTHONVERSION}
+Section ${un}${PYTHONVERSION} ${un}Python${PYTHONVERSION}
     SetShellVarContext all
-    AddSize ${MISC_PYSIZEKB}
 
     StrCmp $PYTHONPATH${PYTHONVERSION} "" python_install_end
 
-    StrCpy $0 $PYTHONPATH${PYTHONVERSION}
-    StrCpy $1 "python.exe"
+    StrCpy $0 "$PYTHONPATH${PYTHONVERSION}"
+    StrCpy $1 "$PYTHONPATH${PYTHONVERSION}\\python.exe"
     StrCpy $2 "${PYTHONVERSION}"
-    Call InstallFiles
+    StrCpy $3 "$PYTHONPATH${PYTHONVERSION}\\Lib\\site-packages"
+    StrCpy $4 "$PYTHONPATH${PYTHONVERSION}\\Scripts"
+    StrCpy $5 "$PYTHONPATH${PYTHONVERSION}\\Include"
+    Call ${un}InstallFiles
 
 python_install_end:
 
 SectionEnd
+!macroend
 
+!macro PythonSection PYTHONVERSION
+!define HAVE_SECTION_PYTHON${PYTHONVERSION}
+; Set up variable for install path of this python version
+Var PYTHONPATH${PYTHONVERSION}
+!insertmacro GetPythonPath ${PYTHONVERSION} ""
+!insertmacro PythonSectionDef ${PYTHONVERSION} ""
+; cannot define this in an uninstall section group, hence goes here
+!insertmacro GetPythonPath ${PYTHONVERSION} "un."
 !macroend
 
 !macro un.PythonSection PYTHONVERSION
-
-Section un.Python${PYTHONVERSION}
-    SetShellVarContext all
-
-    StrCmp $PYTHONPATH${PYTHONVERSION} "" python_uninstall_end
-
-    StrCpy $0 $PYTHONPATH${PYTHONVERSION}
-    StrCpy $1 "python.exe"
-    StrCpy $2 "${PYTHONVERSION}"
-    Call un.UninstallFiles
-
-python_uninstall_end:
-
-SectionEnd
-
+!insertmacro PythonSectionDef ${PYTHONVERSION} "un."
 !macroend
 
 
@@ -893,13 +946,16 @@ FunctionEnd
 ; Install the library for Maya ${MAYAVERSION}
 Section "${MAYAVERSION}" Maya${MAYAVERSION}
     SetShellVarContext all
-    AddSize ${MISC_PYSIZEKB}
 
     StrCmp $MAYAPATH${MAYAVERSION} "" maya_install_end
 
-    StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
-    StrCpy $1 "..\\bin\mayapy.exe"
+    StrCpy $0 "$MAYAPATH${MAYAVERSION}\\Python"
+    StrCpy $1 "$MAYAPATH${MAYAVERSION}\\bin\\mayapy.exe"
     StrCpy $2 "${PYTHONVERSION}"
+    StrCpy $3 "$MAYAPATH${MAYAVERSION}\\Python\\Lib\\site-packages"
+    StrCpy $4 "" ; no scripts
+    StrCpy $5 "" ; no headers
+
     Call InstallFiles
 
 maya_install_end:
@@ -915,10 +971,14 @@ Section un.Maya${MAYAVERSION}
 
     StrCmp $MAYAPATH${MAYAVERSION} "" maya_uninstall_end
 
-    StrCpy $0 "$MAYAPATH${MAYAVERSION}\Python"
-    StrCpy $1 "..\\bin\mayapy.exe"
+    StrCpy $0 "$MAYAPATH${MAYAVERSION}\\Python"
+    StrCpy $1 "$MAYAPATH${MAYAVERSION}\\bin\\mayapy.exe"
     StrCpy $2 "${PYTHONVERSION}"
-    Call un.UninstallFiles
+    StrCpy $3 "$MAYAPATH${MAYAVERSION}\\Python\\Lib\\site-packages"
+    StrCpy $4 "" ; no scripts
+    StrCpy $5 "" ; no headers
+
+    Call un.InstallFiles
 
 maya_uninstall_end:
 
@@ -927,6 +987,157 @@ SectionEnd
 !macroend
 
 !endif ;MISC_MAYA
+
+
+
+!ifdef MISC_BLENDER
+
+; Function to detect the blender path
+!macro GetBlenderPath un
+Function ${un}GetBlenderPath
+  ; clear variables
+  StrCpy $BLENDERHOME ""
+  StrCpy $BLENDERSCRIPTS ""
+  StrCpy $BLENDERINST ""
+
+  ClearErrors
+
+  ReadRegStr $BLENDERHOME HKLM SOFTWARE\BlenderFoundation "Install_Dir"
+  IfErrors 0 blender_registry_check_end
+  ReadRegStr $BLENDERHOME HKCU SOFTWARE\BlenderFoundation "Install_Dir"
+  IfErrors 0 blender_registry_check_end
+
+     ; no key, that means that Blender is not installed
+     Goto blender_scripts_not_found
+
+blender_registry_check_end:
+  StrCpy $BLENDERINST $BLENDERHOME
+
+  ; get Blender scripts dir
+
+  ; first try Blender's global install dir
+  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
+  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+
+; XXX check disabled for now - function should be non-interactive
+;  ; check if we are running vista, if so, complain to user because scripts are not in the "safe" location
+;  Call GetWindowsVersion
+;  Pop $0
+;  StrCmp $0 "Vista" 0 blender_scripts_notininstallfolder
+;  
+;    MessageBox MB_YESNO|MB_ICONQUESTION "You are running Windows Vista, but Blender's user data files (such as scripts) do not reside in Blender's installation directory. On Vista, Blender will sometimes only find its scripts if Blender's user data files reside in Blender's installation directory. Do you wish to abort installation, and first reinstall Blender, selecting 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files?" IDNO blender_scripts_notininstallfolder
+;    MessageBox MB_OK "Pressing OK will take you to the Blender download page. Please download and run the Blender windows installer. Select 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files. When you are done, rerun the ColladaCGF installer."
+;    StrCpy $0 "http://www.blender.org/download/get-blender/"
+;    Call openLinkNewWindow
+;    Abort ; causes installer to quit
+;
+;blender_scripts_notininstallfolder:
+
+  ; now try Blender's application data directory (current user)
+  SetShellVarContext current
+  StrCpy $BLENDERHOME "$APPDATA\Blender Foundation\Blender"
+  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
+  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+  
+  ; now try Blender's application data directory (everyone)
+  SetShellVarContext all
+  StrCpy $BLENDERHOME "$APPDATA\Blender Foundation\Blender"
+  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
+  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+
+  ; finally, try the %HOME% variable
+  ReadEnvStr $BLENDERHOME "HOME"
+  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
+  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+  
+    ; all failed!
+    GoTo blender_scripts_not_found
+
+blender_scripts_found:
+
+    ; remove trailing backslash using the $EXEDIR trick
+    Push $BLENDERHOME
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $BLENDERHOME
+    Push $BLENDERSCRIPTS
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $BLENDERSCRIPTS
+    Push $BLENDERINST
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $BLENDERINST
+
+    ; debug
+    ;MessageBox MB_OK "Found Blender scripts in $BLENDERSCRIPTS"
+
+    IfFileExists $BLENDERINST\\blender.exe blender_scripts_done blender_scripts_not_found
+
+blender_scripts_not_found:
+
+  StrCpy $BLENDERHOME ""
+  StrCpy $BLENDERSCRIPTS ""
+  StrCpy $BLENDERINST ""
+
+blender_scripts_done:
+
+FunctionEnd
+!macroend
+
+!macro BlenderSection
+
+; Set up variable for install path of Blender
+Var BLENDERHOME    ; blender settings location
+Var BLENDERSCRIPTS ; blender scripts location ($BLENDERHOME/.blender/scripts)
+Var BLENDERINST    ; blender.exe location
+
+!insertmacro GetBlenderPath ""
+
+; Install the library for Blender 
+Section Blender Blender
+    SetShellVarContext all
+
+    StrCmp $BLENDERSCRIPTS "" blender_install_end
+
+    StrCpy $0 "" ; XXX todo: set python path
+    StrCpy $1 "" ; XXX todo: set python executable
+    StrCpy $2 "" ; XXX todo: set python version
+    StrCpy $3 "$BLENDERSCRIPTS\\bpymodules"
+    StrCpy $4 "" ; no scripts
+    StrCpy $5 "" ; no headers
+    Call InstallFiles
+
+blender_install_end:
+
+SectionEnd
+
+!macroend ;BlenderSection
+
+!macro un.BlenderSection
+
+!insertmacro GetBlenderPath "un."
+
+Section un.Blender
+    SetShellVarContext all
+
+    StrCmp $BLENDERSCRIPTS "" blender_uninstall_end
+
+    StrCpy $0 "" ; XXX todo: set python path
+    StrCpy $1 "" ; XXX todo: set python executable
+    StrCpy $2 "" ; XXX todo: set python version
+    StrCpy $3 "$BLENDERSCRIPTS\\bpymodules"
+    StrCpy $4 "" ; no scripts
+    StrCpy $5 "" ; no headers
+    Call un.InstallFiles
+
+blender_uninstall_end:
+
+SectionEnd
+
+!macroend ;un.BlenderSection
+
+!endif ;MISC_BLENDER
 
 
 
@@ -1076,6 +1287,7 @@ Function .onInit
 
   ; check python versions
 """ + "\n".join("""\
+  SectionSetSize ${Python${PYTHONVERSION}} ${MISC_PYSIZEKB}
   Call GetPythonPath${PYTHONVERSION}
   StrCmp $PYTHONPATH${PYTHONVERSION} "" 0 +2
   ; python version not found, so disable that section
@@ -1088,13 +1300,24 @@ Function .onInit
   !ifdef MISC_MAYA
 
 """ + "\n".join("""\
+  SectionSetSize ${Maya${MAYAVERSION}} ${MISC_PYSIZEKB}
   Call GetMayaPath${MAYAVERSION}
   StrCmp $MAYAPATH${MAYAVERSION} "" 0 +2
-  ; python version not found, so disable that section
+  ; maya version not found, so disable that section
   SectionSetFlags ${Maya${MAYAVERSION}} ${SF_RO}
 """.replace("${MAYAVERSION}", mayaversion)
                 for pythonversion, mayaversion, mayaregistry in mayaversions) + """
   !endif ;MISC_MAYA
+
+  !ifdef MISC_BLENDER
+
+  SectionSetSize ${Blender} ${MISC_PYSIZEKB}
+  Call GetBlenderPath
+  StrCmp $BLENDERSCRIPTS "" 0 +2
+  ; blender version not found, so disable that section
+  SectionSetFlags ${Blender} ${SF_RO}
+
+  !endif ;MISC_BLENDER
 
 FunctionEnd
 
@@ -1102,12 +1325,22 @@ Function un.onInit
 """ + "\n".join("  Call un.GetPythonPath%s" % pythonversion
                  for pythonversion in pythonversions) + """
 
+
   !ifdef MISC_MAYA
 
 """ + "\n".join("  Call un.GetMayaPath%s" % mayaversion
                  for pythonversion, mayaversion, mayaregistry in mayaversions) + """
 """ + """
   !endif ;MISC_MAYA
+
+
+
+  !ifdef MISC_BLENDER
+
+  Call un.GetBlenderPath
+
+  !endif ;MISC_BLENDER
+
 FunctionEnd
 
 Section -Post
@@ -1176,5 +1409,9 @@ SectionEnd
                 % (pythonversion, mayaversion, mayaregistry)
                 for pythonversion, mayaversion, mayaregistry in mayaversions)
             + "\nSectionGroupEnd\n\n"
-            + "!endif ;MISC_MAYA\n\n"
+            + "!endif ;MISC_MAYA\n\n\n"
+            + "!ifdef MISC_BLENDER\n"
+            + "!insertmacro BlenderSection\n"
+            + "!insertmacro un.BlenderSection\n"
+            + "!endif ;MISC_BLENDER\n\n\n"
             + NSI_FOOTER)
