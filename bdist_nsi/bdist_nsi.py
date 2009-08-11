@@ -1198,10 +1198,6 @@ FunctionEnd
 !endif
 
 Function .onInit
-  MessageBox MB_YESNO|MB_ICONEXCLAMATION "Installer is experimental and is likely to fail. Continue?" IDYES +2
-
-    Abort ; quit installer
-
   ; Check if user is admin.
   ; Call userInfo plugin to get user info.
   ; The plugin puts the result in the stack.
