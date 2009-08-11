@@ -153,17 +153,17 @@ class bdist_nsi(Command):
 
         if not self.headerbitmap:
             self.headerbitmap = os.path.join(os.path.dirname(__file__),
-                                             "python-install-150x57.bmp")
+                                             "python-install-150x57.bmp").replace("/", "\\")
         else:
-            self.headerbitmap = os.path.abspath(self.headerbitmap)
+            self.headerbitmap = self.abspath(self.headerbitmap)
         if not self.bitmap:
             self.bitmap = os.path.join(os.path.dirname(__file__),
-                                       "python-install-164x314.bmp")
+                                       "python-install-164x314.bmp").replace("/", "\\")
         else:
-            self.bitmap = os.path.abspath(self.bitmap)
+            self.bitmap = self.abspath(self.bitmap)
 
         if self.nshextra:
-            self.nshextra = os.path.abspath(self.nshextra)
+            self.nshextra = self.abspath(self.nshextra)
 
         self.set_undefined_options('bdist',
                                    ('dist_dir', 'dist_dir'),
@@ -173,6 +173,9 @@ class bdist_nsi(Command):
 
     # finalize_options()
 
+    def abspath(self, filename):
+        # absolute path with windows separator
+        return os.path.abspath(filename).replace('/', '\\')
 
     def run (self):
         if (sys.platform != "win32" and
@@ -290,18 +293,16 @@ class bdist_nsi(Command):
             if os.path.exists(licensefile):
                 nsiscript=nsiscript.replace('@haslicensefile@', "")
                 nsiscript=nsiscript.replace('@licensefile@',
-                                            os.path.abspath(licensefile))
+                                            self.abspath(licensefile))
                 break
         else:
             nsiscript=nsiscript.replace('@haslicensefile@', ";")
 
-        # dist dir relative to the build dir
-        distdir=os.path.join('..','..','..',self.dist_dir)
-            
         if self.target_version:
-            installer_path = os.path.join(distdir, "%s.win32-py%s.exe" % (self.distribution.get_fullname(), self.target_version))
+            installer_path = os.path.join(self.dist_dir, "%s.win32-py%s.exe" % (self.distribution.get_fullname(), self.target_version))
         else:
-            installer_path = os.path.join(distdir, "%s.win32.exe" % self.distribution.get_fullname())
+            installer_path = os.path.join(self.dist_dir, "%s.win32.exe" % self.distribution.get_fullname())
+        installer_path = self.abspath(installer_path)
                 
         nsiscript=nsiscript.replace('@installer_path@',installer_path)
         
@@ -378,7 +379,6 @@ class bdist_nsi(Command):
         for _d, _r, tag in zip([_d_packages, _d_scripts, _d_include],
                                [_r_packages, _r_scripts, _r_include],
                                ['packages', 'scripts', 'include']):
-            print _r
             _d.append('  ; cleaning folders\n')
             for root in _r:
                 if root.endswith("\\"):
@@ -543,16 +543,16 @@ class bdist_nsi(Command):
         else:
             nsiscript=nsiscript.replace('@blender@',';')   
 
-        nsiscript = nsiscript.replace("@srcdir@", os.getcwd())
+        nsiscript = nsiscript.replace("@srcdir@", self.abspath(os.getcwd()))
 
         # icon files
         # XXX todo: make icons configurable
         nsiscript = nsiscript.replace(
             "@ico_install@",
-            os.path.join(os.path.dirname(__file__), "python-install.ico"))
+            self.abspath(os.path.join(os.path.dirname(__file__), "python-install.ico")))
         nsiscript = nsiscript.replace(
             "@ico_uninstall@",
-            os.path.join(os.path.dirname(__file__), "python-uninstall.ico"))
+            self.abspath(os.path.join(os.path.dirname(__file__), "python-uninstall.ico")))
         nsiscript = nsiscript.replace("@header_bitmap@", self.headerbitmap)
         nsiscript = nsiscript.replace("@welcome_bitmap@", self.bitmap)
         nsifile=open(os.path.join(self.bdist_dir,'setup.nsi'),'wt')
