@@ -2,7 +2,7 @@
 
 """Setup script for bdist_nsi."""
 
-classifiers = """Development Status :: 2 - Pre-Alpha
+classifiers = """Development Status :: 4 - Beta
 Intended Audience :: Developers
 License :: OSI Approved :: BSD License
 Natural Language :: English
@@ -26,7 +26,7 @@ setup(
     #       (which formed the original basis of bdist_nsi) is j-cg
     author = 'Amorilia',
     author_email = 'amorilia@users.sourceforge.net',
-    url = 'http://github.com/amorilia/bdist_nsi',
+    url = 'http://bdist-nsi.sourceforge.net/',
     license = 'BSD',
     platforms = ["any"],
     classifiers = filter(None, classifiers.split("\n")),
