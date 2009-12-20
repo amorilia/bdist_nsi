@@ -822,7 +822,13 @@ Function ${un}GetPythonPath${PYTHONVERSION}
     IfErrors 0 python_registry_found
 
     ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors python_not_found python_registry_found
+    IfErrors 0 python_registry_found
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Python ${PYTHONVERSION} not found in registry."
+!endif
+
+    Goto python_path_done
 
 python_registry_found:
 
@@ -832,12 +838,23 @@ python_registry_found:
     Exch $EXEDIR
     Pop $PYTHONPATH${PYTHONVERSION}
 
-    ; debug
-    ;MessageBox MB_OK "Found Python ${PYTHONVERSION} in $PYTHONPATH${PYTHONVERSION}"
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Found Python ${PYTHONVERSION} path in registry: $PYTHONPATH${PYTHONVERSION}"
+!endif
 
-    IfFileExists $PYTHONPATH${PYTHONVERSION}\python.exe python_path_done python_not_found
+    IfFileExists $PYTHONPATH${PYTHONVERSION}\python.exe 0 python_exe_not_found
 
-python_not_found:
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Found Python executable at $PYTHONPATH${PYTHONVERSION}\python.exe."
+!endif
+
+    GoTo python_path_done
+
+python_exe_not_found:
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Python ${PYTHONVERSION} executable not found."
+!endif
 
     StrCpy $PYTHONPATH${PYTHONVERSION} ""
 
