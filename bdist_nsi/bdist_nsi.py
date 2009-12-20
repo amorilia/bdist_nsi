@@ -824,6 +824,9 @@ Function ${un}GetPythonPath${PYTHONVERSION}
     ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
     IfErrors 0 python_registry_found
 
+    ; clean string just in case
+    StrCpy $PYTHONPATH${PYTHONVERSION} ""
+
 !ifdef MISC_DEBUG
     MessageBox MB_OK "Python ${PYTHONVERSION} not found in registry."
 !endif
@@ -911,7 +914,10 @@ Function ${un}GetMayaPath${MAYAVERSION}
     ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
     IfErrors 0 maya_registry_found
 
-    Goto maya_not_found
+    ; clean string just in case
+    StrCpy $MAYAPATH${MAYAVERSION} ""
+
+    Goto maya_path_done
 
 maya_registry_found:
 
