@@ -917,6 +917,10 @@ Function ${un}GetMayaPath${MAYAVERSION}
     ; clean string just in case
     StrCpy $MAYAPATH${MAYAVERSION} ""
 
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Maya ${MAYAVERSION} not found in registry."
+!endif
+
     Goto maya_path_done
 
 maya_registry_found:
@@ -927,12 +931,23 @@ maya_registry_found:
     Exch $EXEDIR
     Pop $MAYAPATH${MAYAVERSION}
 
-    ; debug
-    ;MessageBox MB_OK "Found Maya ${MAYAVERSION} in $MAYAPATH${MAYAVERSION}"
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Found Maya ${MAYAVERSION} path in registry: $MAYAPATH${MAYAVERSION}"
+!endif
 
-    IfFileExists $MAYAPATH${MAYAVERSION}\\bin\mayapy.exe maya_path_done maya_not_found
+    IfFileExists $MAYAPATH${MAYAVERSION}\\bin\mayapy.exe 0 mayapy_exe_not_found
 
-maya_not_found:
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Found Python executable for Maya ${MAYAVERSION} at $MAYAPATH${MAYAVERSION}\\bin\mayapy.exe."
+!endif
+
+    GoTo maya_path_done
+
+mayapy_exe_not_found:
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Python executable for Maya ${MAYAVERSION} not found."
+!endif
 
     StrCpy $MAYAPATH${MAYAVERSION} ""
 
