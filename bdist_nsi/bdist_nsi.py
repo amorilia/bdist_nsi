@@ -818,8 +818,16 @@ FunctionEnd
 Function ${un}GetPythonPath${PYTHONVERSION}
     ClearErrors
 
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for registry key HKLM\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
+!endif
+
     ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
     IfErrors 0 python_registry_found
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for registry key HKCU\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
+!endif
 
     ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
     IfErrors 0 python_registry_found
@@ -908,8 +916,16 @@ Var PYTHONPATH${PYTHONVERSION}
 Function ${un}GetMayaPath${MAYAVERSION}
     ClearErrors
 
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for registry key HKLM\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
+!endif
+
     ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
     IfErrors 0 maya_registry_found
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for registry key HKCU\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
+!endif
 
     ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
     IfErrors 0 maya_registry_found
