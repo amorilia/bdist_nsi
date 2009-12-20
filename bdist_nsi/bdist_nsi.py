@@ -71,11 +71,13 @@ class bdist_nsi(Command):
                      "include (compatible) Maya targets in installer"),
                     ('blender', None,
                      "include (compatible) Blender targets in installer"),
+                    ('debug', None,
+                     "debug mode (only use if you know what you are doing)"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
                        'skip-build', 'run2to3', 'msvc2005', 'msvc2005sp1',
-                       'msvc2008', 'msvc2008sp1', 'maya', 'blender']
+                       'msvc2008', 'msvc2008sp1', 'maya', 'blender', 'debug']
 
     def initialize_options (self):
         self.bdist_dir = None
@@ -99,6 +101,7 @@ class bdist_nsi(Command):
         self.target_versions = None
         self.maya = 0
         self.blender = 0
+        self.debug = 0
 
     # initialize_options()
 
@@ -543,6 +546,11 @@ class bdist_nsi(Command):
         else:
             nsiscript=nsiscript.replace('@blender@',';')   
 
+        if self.debug:
+            nsiscript=nsiscript.replace('@debug@','')
+        else:
+            nsiscript=nsiscript.replace('@debug@',';')   
+
         nsiscript = nsiscript.replace("@srcdir@", self.abspath(os.getcwd()))
 
         # icon files
@@ -631,6 +639,7 @@ def get_nsi(pythonversions=None):
 @hasurl@BrandingText "@url@"
 @hasnshextra@!define MISC_NSHEXTRA "1"
 
+@debug@!define MISC_DEBUG "1"
 
 
 ; Various Settings
