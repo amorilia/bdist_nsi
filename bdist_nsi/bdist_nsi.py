@@ -625,6 +625,7 @@ def get_nsi(pythonversions=None):
 !define PRODUCT_WEB_SITE "@url@"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
+!define PRODUCT_UNINST_REG_VIEW 32
 !define MISC_SRCDIR "@srcdir@"
 !define MISC_PYSIZEKB "@pysizekb@"
 @compile@!define MISC_COMPILE "1"
@@ -818,15 +819,35 @@ FunctionEnd
 Function ${un}GetPythonPath${PYTHONVERSION}
     ClearErrors
 
+    ; first check the 32 bit registry
+    SetRegView 32
+
 !ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for registry key HKLM\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
+    MessageBox MB_OK "Looking for 32 bit registry key HKLM\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
 !endif
 
     ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
     IfErrors 0 python_registry_found
 
 !ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for registry key HKCU\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
+    MessageBox MB_OK "Looking for 32 bit registry key HKCU\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
+!endif
+
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
+    IfErrors 0 python_registry_found
+
+    ; now check the 64 bit registry
+    SetRegView 64
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for 64 bit registry key HKLM\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
+!endif
+
+    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
+    IfErrors 0 python_registry_found
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for 64 bit registry key HKCU\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
 !endif
 
     ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
@@ -916,15 +937,35 @@ Var PYTHONPATH${PYTHONVERSION}
 Function ${un}GetMayaPath${MAYAVERSION}
     ClearErrors
 
+    ; first check the 32 bit registry
+    SetRegView 32
+
 !ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for registry key HKLM\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
+    MessageBox MB_OK "Looking for 32 bit registry key HKLM\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
 !endif
 
     ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
     IfErrors 0 maya_registry_found
 
 !ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for registry key HKCU\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
+    MessageBox MB_OK "Looking for 32 bit registry key HKCU\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
+!endif
+
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
+    IfErrors 0 maya_registry_found
+
+    ; now check the 64 bit registry
+    SetRegView 64
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for 64 bit registry key HKLM\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
+!endif
+
+    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
+    IfErrors 0 maya_registry_found
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Looking for 64 bit registry key HKCU\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
 !endif
 
     ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
@@ -1020,6 +1061,15 @@ Function ${un}GetBlenderPath
 
   ClearErrors
 
+  ; first check the 32 bit registry
+  SetRegView 32
+  ReadRegStr $BLENDERHOME HKLM SOFTWARE\BlenderFoundation "Install_Dir"
+  IfErrors 0 blender_registry_check_end
+  ReadRegStr $BLENDERHOME HKCU SOFTWARE\BlenderFoundation "Install_Dir"
+  IfErrors 0 blender_registry_check_end
+
+  ; now check the 64 bit registry
+  SetRegView 64
   ReadRegStr $BLENDERHOME HKLM SOFTWARE\BlenderFoundation "Install_Dir"
   IfErrors 0 blender_registry_check_end
   ReadRegStr $BLENDERHOME HKCU SOFTWARE\BlenderFoundation "Install_Dir"
@@ -1341,6 +1391,7 @@ FunctionEnd
 Section -Post
   SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\\${PRODUCT_NAME}_uninstall.exe"
+  SetRegView ${PRODUCT_UNINST_REG_VIEW}
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\${PRODUCT_NAME}_uninstall.exe"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
@@ -1376,6 +1427,7 @@ Section un.Post
 
   Delete "$INSTDIR\\${PRODUCT_NAME}_uninstall.exe"
   RmDir "$INSTDIR"
+  SetRegView ${PRODUCT_UNINST_REG_VIEW}
   DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
 SectionEnd
 """
