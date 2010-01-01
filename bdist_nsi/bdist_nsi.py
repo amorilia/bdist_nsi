@@ -242,9 +242,9 @@ class bdist_nsi(Command):
         elif self.target_versions:
             nsiscript = get_nsi(pythonversions=self.target_versions.split(","))
         else:
-            pythonversions = ["2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9"]
+            pythonversions = ["2.3", "2.4", "2.5", "2.6", "2.7"]
             if self.run2to3:
-                pythonversions.extend(["3.0", "3.1", "3.2", "3.3", "3.4"])
+                pythonversions.extend(["3.0", "3.1", "3.2"])
             nsiscript = get_nsi(pythonversions=pythonversions)
         metadata = self.distribution.metadata
 
