@@ -116,6 +116,23 @@ class AppInfo:
                    not_found_label))
         yield "!macroend"
 
+    @staticmethod
+    def make_major_minor_bits_tuples(versions, bits=None):
+        """Convert string versions into tuple versions.
+
+        >>> list(AppInfo.make_major_minor_bits_tuples(["2.5", "3.1"]))
+        [(2, 5, 32), (2, 5, 64), (3, 1, 32), (3, 1, 64)]
+        >>> list(AppInfo.make_major_minor_bits_tuples(["2.5", "3.1"], bits=64))
+        [(2, 5, 64), (3, 1, 64)]
+        """
+        for version in versions:
+            major, minor = version.split(".")
+            if bits is None:
+                for bits_ in [32, 64]:
+                    yield int(major), int(minor), bits_
+            else:
+                yield int(major), int(minor), bits
+
 class PythonAppInfo(AppInfo):
     r"""Python application info.
 
@@ -125,25 +142,6 @@ class PythonAppInfo(AppInfo):
         !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKCU "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found} ${if_not_found}
     !macroend
     """
-
-    PYTHON_VERSIONS = [
-        (2, 3, 32),
-        (2, 3, 64),
-        (2, 4, 32),
-        (2, 4, 64),
-        (2, 5, 32),
-        (2, 5, 64),
-        (2, 6, 32),
-        (2, 6, 64),
-        (2, 7, 32),
-        (2, 7, 64),
-        (3, 0, 32),
-        (3, 0, 64),
-        (3, 1, 32),
-        (3, 1, 64),
-        (3, 2, 32),
-        (3, 2, 64),
-        ]
 
     def __init__(self, major=None, minor=None, bits=None):
         r"""Constructor.
@@ -198,6 +196,20 @@ class PythonAppInfo(AppInfo):
         """
         return ("PythonAppInfo(major=%i, minor=%i, bits=%i)"
                 % (self.major, self.minor, self.bits))
+
+    @classmethod
+    def make_python_apps(cls, versions=None, bits=None):
+        """Get all applications of python that match versions, which is
+        a list of the form ["2.3", "2.4"] etc.
+
+        >>> PythonAppInfo.make_python_apps(["2.1", "2.2"])
+        [PythonAppInfo(major=2, minor=1, bits=32), PythonAppInfo(major=2, minor=1, bits=64), PythonAppInfo(major=2, minor=2, bits=32), PythonAppInfo(major=2, minor=2, bits=64)]
+        >>> PythonAppInfo.make_python_apps(["2.3", "3.0"], bits=32)
+        [PythonAppInfo(major=2, minor=3, bits=32), PythonAppInfo(major=3, minor=0, bits=32)]
+        """
+        major_minor_bits = cls.make_major_minor_bits_tuples(versions, bits)
+        return [PythonAppInfo(major=major, minor=minor, bits=bits)
+                for major, minor, bits in major_minor_bits]
 
 class bdist_nsi(Command):
 
@@ -772,6 +784,9 @@ class bdist_nsi(Command):
 # class bdist_nsi
 
 def get_nsi(pythonversions=None):
+    # list all python applications
+    python_apps = PythonAppInfo.make_python_apps(pythonversions)
+
     # list all maya versions
     mayaversions = [
         ("2.5", "2008", "2008"),
@@ -1008,7 +1023,9 @@ FunctionEnd
     StrCpy ${variable} ""
 !macroend
 
-
+""" + "\n\n".join(
+    "\n".join(python_app.macro_get_registry_keys())
+    for python_app in python_apps) + """
 
 !macro GET_REGISTRY_KEY_PYTHON PYTHONVERSION if_found if_not_found
     !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
