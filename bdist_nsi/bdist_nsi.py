@@ -19,6 +19,103 @@ from distutils import log
 from distutils.spawn import spawn
 from distutils.command.install import WINDOWS_SCHEME
 
+class RegKey:
+    """Stores the location of a registry key."""
+    view = None
+    root = None
+    key = None
+    name = None
+
+    def __init__(self, view=None, root=None, key=None, name=None):
+        """Initialize key."""
+        self.view = view
+        self.root = root
+        self.key = key
+        self.name = name
+
+    def __repr__(self):
+        r"""String representation.
+
+        >>> RegKey(view=32, root="HKLM", key=r"Software\BlenderFoundation",
+        ...        name="Install_Dir")
+        RegKey(view=32, root='HKLM', key='Software\\BlenderFoundation', name='Install_Dir')
+        """
+        return(
+            "RegKey(view=%s, root=%s, key=%s, name=%s)"
+            % (repr(self.view), repr(self.root),
+               repr(self.key), repr(self.name)))
+
+class AppInfo:
+    """Information of an application which integrates Python (possibly,
+    Python itself).
+    """
+    name = None
+    label = None
+    regkeys = None  # list of registry keys
+    py_major = None # 1, 2, 3, ...
+    py_minor = None # minor python version
+
+    def __init__(self, name=None, label=None, regkeys=None,
+                 py_major=None, py_minor=None):
+        """Initialize application information."""
+        self.name = name
+        self.label = label
+        self.regkeys = regkeys
+        self.py_major = py_major
+        self.py_minor = py_minor
+
+    def __repr__(self):
+        r"""Return string representation.
+
+        >>> regkey = RegKey(view=32, root="HKLM",
+        ...                 key=r"Software\BlenderFoundation",
+        ...                 name="Install_Dir")
+        >>> AppInfo(name="Test", label="test", regkeys=[regkey],
+        ...         py_major=3, py_minor=2)
+        AppInfo(name='Test', label='test', regkeys=[RegKey(view=32, root='HKLM', key='Software\\BlenderFoundation', name='Install_Dir')], py_major=3, py_minor=2)
+        """
+        return (
+            "AppInfo(name=%s, label=%s, regkeys=%s, py_major=%s, py_minor=%s)"
+            % (repr(self.name), repr(self.label), repr(self.regkeys),
+               repr(self.py_major), repr(self.py_minor)))
+
+    def macro_get_registry_keys(self):
+        r"""Returns NSIS script which defines a macro which jumps to
+        if_found if the registry key is found in any of the listed
+        registry keys, storing the result in $PATH_${label}, and jumps to
+        if_not_found otherwise.
+
+        >>> regkey1 = RegKey(view=32, root="HKLM",
+        ...                  key=r"Software\BlenderFoundation",
+        ...                  name="Install_Dir")
+        >>> regkey2 = RegKey(view=64, root="HKCU",
+        ...                  key=r"SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath",
+        ...                  name="MAYA_INSTALL_LOCATION")
+        >>> regkey3 = RegKey(view=32, root="HKCR",
+        ...                  key="NSIS.Header",
+        ...                  name="DefaultIcon")
+        >>> app = AppInfo(name="Test", label="test",
+        ...               regkeys=[regkey1, regkey2, regkey3],
+        ...               py_major=3, py_minor=2)
+        >>> print("\n".join(app.macro_get_registry_keys()))
+        !macro GET_REGISTRY_KEYS_test if_found if_not_found
+            !insertmacro GET_REGISTRY_KEY Test test 32 HKLM "Software\BlenderFoundation" "Install_Dir" ${if_found} 0
+            !insertmacro GET_REGISTRY_KEY Test test 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+            !insertmacro GET_REGISTRY_KEY Test test 32 HKCR "NSIS.Header" "DefaultIcon" ${if_found} ${if_not_found}
+        !macroend
+        """
+        yield "!macro GET_REGISTRY_KEYS_%s if_found if_not_found" % self.label
+        not_found_labels = (
+            ["0"] * (len(self.regkeys) - 1) + ["${if_not_found}"])
+        for regkey, not_found_label in zip(self.regkeys, not_found_labels):
+            yield (
+                '    !insertmacro GET_REGISTRY_KEY %s %s %s %s "%s" "%s"'
+                ' ${if_found} %s'
+                % (self.name, self.label,
+                   regkey.view, regkey.root, regkey.key, regkey.name,
+                   not_found_label))
+        yield "!macroend"
+
 class bdist_nsi(Command):
 
     description = "create an executable installer for MS Windows, using NSIS"
