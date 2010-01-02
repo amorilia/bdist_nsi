@@ -123,7 +123,7 @@ class AppInfo:
 
     def insertmacro_variables(self):
         """Define variables."""
-        yield "var $PATH_%s" % self.label
+        yield "var PATH_%s" % self.label
 
     def macro_section_extra(self):
         """Define section."""
@@ -242,7 +242,7 @@ class PythonAppInfo(AppInfo):
 
     def macro_get_path_extra_check(self):
         """Returns NSIS script which validates the python path."""
-        yield '!macro GET_PATH_EXTRA_CHECK_PYTHON_%s' % self.label
+        yield '!macro GET_PATH_EXTRA_CHECK_%s' % self.label
         yield '    !insertmacro GET_PATH_EXTRA_CHECK_PYTHON %s' % self.label
         yield '!macroend'
 
@@ -250,7 +250,7 @@ class PythonAppInfo(AppInfo):
         """Returns NSIS script which sets up the installation variables
         in the section definition.
         """
-        yield '!macro SECTION_EXTRA_PYTHON_%s' % self.label
+        yield '!macro SECTION_EXTRA_%s' % self.label
         yield ('    !insertmacro SECTION_EXTRA_PYTHON %s %i %i'
                % (self.label, self.major, self.minor))
         yield '!macroend'
@@ -1176,6 +1176,13 @@ FunctionEnd
 
 
 
+; Variables
+; =========
+
+""" + "\n".join(
+    "\n".join(python_app.insertmacro_variables())
+    for python_app in python_apps) + """
+
 ; Macros
 ; ======
 
@@ -1254,7 +1261,7 @@ python_exe_not_found_${label}:
     for python_app in python_apps) + """
 
 !macro SECTION un name label
-Section "${un}$name" ${un}section_${label}
+Section "${un}${name}" ${un}section_${label}
     SetShellVarContext all
     StrCmp $PATH_${label} "" section_end
 
@@ -1278,90 +1285,11 @@ SectionEnd
     "\n".join(python_app.macro_section_extra())
     for python_app in python_apps) + """
 
-
-
-!macro GET_REGISTRY_KEY_PYTHON PYTHONVERSION if_found if_not_found
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} ${if_not_found}
-!macroend
-
-!macro GetPythonPath PYTHONVERSION un
-; Function to detect the python path
-Function ${un}GetPythonPath${PYTHONVERSION}
-    !insertmacro GET_REGISTRY_KEY_PYTHON ${PYTHONVERSION} registry_key_found 0
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Python ${PYTHONVERSION} not found in registry."
-!endif
-
-    Goto python_path_done
-
-registry_key_found:
-
-    ; remove trailing backslash using the $EXEDIR trick
-    Push $PYTHONPATH${PYTHONVERSION}
-    Exch $EXEDIR
-    Exch $EXEDIR
-    Pop $PYTHONPATH${PYTHONVERSION}
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Found Python ${PYTHONVERSION} path in registry: $PYTHONPATH${PYTHONVERSION}"
-!endif
-
-    IfFileExists $PYTHONPATH${PYTHONVERSION}\python.exe 0 python_exe_not_found
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Found Python executable at $PYTHONPATH${PYTHONVERSION}\python.exe."
-!endif
-
-    GoTo python_path_done
-
-python_exe_not_found:
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Python ${PYTHONVERSION} executable not found."
-!endif
-
-    StrCpy $PYTHONPATH${PYTHONVERSION} ""
-
-python_path_done:
-
-FunctionEnd
-!macroend
-
-!macro PythonSectionDef PYTHONVERSION un
-; Install the library for Python ${PYTHONVERSION}
-Section ${un}${PYTHONVERSION} ${un}Python${PYTHONVERSION}
-    SetShellVarContext all
-
-    StrCmp $PYTHONPATH${PYTHONVERSION} "" python_install_end
-
-    StrCpy $0 "$PYTHONPATH${PYTHONVERSION}"
-    StrCpy $1 "$PYTHONPATH${PYTHONVERSION}\\python.exe"
-    StrCpy $2 "${PYTHONVERSION}"
-    StrCpy $3 "$PYTHONPATH${PYTHONVERSION}\\Lib\\site-packages"
-    StrCpy $4 "$PYTHONPATH${PYTHONVERSION}\\Scripts"
-    StrCpy $5 "$PYTHONPATH${PYTHONVERSION}\\Include"
-    Call ${un}InstallFiles
-
-python_install_end:
-
-SectionEnd
-!macroend
-
-!macro PythonSection PYTHONVERSION
-!define HAVE_SECTION_PYTHON${PYTHONVERSION}
-; Set up variable for install path of this python version
-Var PYTHONPATH${PYTHONVERSION}
-!insertmacro GetPythonPath ${PYTHONVERSION} ""
-!insertmacro GetPythonPath ${PYTHONVERSION} "un."
-!insertmacro PythonSectionDef ${PYTHONVERSION} ""
-!macroend
-
-!macro un.PythonSection PYTHONVERSION
-!insertmacro PythonSectionDef ${PYTHONVERSION} "un."
+!macro SECTION_SET_PROPERTIES label
+    SectionSetSize ${section_${label}} ${MISC_PYSIZEKB}
+    !insertmacro GET_PATH ${label}
+    StrCmp $PATH_${label} "" 0 +2
+    SectionSetFlags ${section_${label}} ${SF_RO}
 !macroend
 
 
@@ -1734,14 +1662,9 @@ Function .onInit
   !insertmacro MUI_LANGDLL_DISPLAY
 
   ; check python versions
-""" + "\n".join("""\
-  SectionSetSize ${Python${PYTHONVERSION}} ${MISC_PYSIZEKB}
-  Call GetPythonPath${PYTHONVERSION}
-  StrCmp $PYTHONPATH${PYTHONVERSION} "" 0 +2
-  ; python version not found, so disable that section
-  SectionSetFlags ${Python${PYTHONVERSION}} ${SF_RO}
-""".replace("${PYTHONVERSION}", pythonversion)
-                for pythonversion in pythonversions) + """
+""" + "\n".join(
+    "    !insertmacro SECTION_SET_PROPERTIES %s"
+    % app.label for app in python_apps) + """
 
   ; check maya versions
 
@@ -1770,8 +1693,9 @@ Function .onInit
 FunctionEnd
 
 Function un.onInit
-""" + "\n".join("  Call un.GetPythonPath%s" % pythonversion
-                 for pythonversion in pythonversions) + """
+""" + "\n".join(
+    "  !insertmacro GET_PATH %s" % app.label
+    for app in python_apps) + """
 
 
   !ifdef MISC_MAYA
@@ -1838,13 +1762,13 @@ SectionEnd
     return (NSI_HEADER
             + "\nSectionGroup /e Python\n"
             + "\n".join(
-                "!insertmacro PythonSection %s" % pythonversion
-                for pythonversion in pythonversions)
+                '!insertmacro SECTION "" "%s" %s' % (app.name, app.label)
+                for app in python_apps)
             + "\nSectionGroupEnd\n\n"
             + "\nSectionGroup /e un.Python\n"
             + "\n".join(
-                "!insertmacro un.PythonSection %s" % pythonversion
-                for pythonversion in pythonversions)
+                '!insertmacro SECTION "un." "%s" %s' % (app.name, app.label)
+                for app in python_apps)
             + "\nSectionGroupEnd\n\n\n"
             + "!ifdef MISC_MAYA\n"
             + "\nSectionGroup /e Maya\n"
