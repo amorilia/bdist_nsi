@@ -121,6 +121,14 @@ class AppInfo:
         # default: do nothing
         return
 
+    def insertmacro_variables(self):
+        """Define variables."""
+        yield "var $PATH_%s" % self.label
+
+    def macro_section_extra(self):
+        """Define section."""
+        raise NotImplementedError
+
     @staticmethod
     def make_major_minor_bits_tuples(versions, bits=None):
         """Convert string versions into tuple versions.
@@ -238,6 +246,14 @@ class PythonAppInfo(AppInfo):
         yield '    !insertmacro GET_PATH_EXTRA_CHECK_PYTHON %s' % self.label
         yield '!macroend'
 
+    def macro_section_extra(self):
+        """Returns NSIS script which sets up the installation variables
+        in the section definition.
+        """
+        yield '!macro SECTION_EXTRA_PYTHON_%s' % self.label
+        yield ('    !insertmacro SECTION_EXTRA_PYTHON %s %i %i'
+               % (self.label, self.major, self.minor))
+        yield '!macroend'
 
 class MayaAppInfo(AppInfo):
     r"""Maya application info.
@@ -1236,6 +1252,33 @@ python_exe_not_found_${label}:
 """ + "\n\n".join(
     "\n".join(python_app.macro_get_path_extra_check())
     for python_app in python_apps) + """
+
+!macro SECTION un name label
+Section "${un}$name" ${un}section_${label}
+    SetShellVarContext all
+    StrCmp $PATH_${label} "" section_end
+
+    !insertmacro SECTION_EXTRA_${label}
+
+    Call ${un}InstallFiles
+section_end:
+SectionEnd
+!macroend
+
+!macro SECTION_EXTRA_PYTHON label major minor
+    StrCpy $0 "$PATH_${label}"
+    StrCpy $1 "$PATH_${label}\\python.exe"
+    StrCpy $2 "${major}.${minor}"
+    StrCpy $3 "$PATH_${label}\\Lib\\site-packages"
+    StrCpy $4 "$PATH_${label}\\Scripts"
+    StrCpy $5 "$PATH_${label}\\Include"
+!macroend
+
+""" + "\n\n".join(
+    "\n".join(python_app.macro_section_extra())
+    for python_app in python_apps) + """
+
+
 
 !macro GET_REGISTRY_KEY_PYTHON PYTHONVERSION if_found if_not_found
     !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
