@@ -830,13 +830,17 @@ FunctionEnd
 
 
 
+!macro GET_REGISTRY_KEY_PYTHON PYTHONVERSION if_found if_not_found
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} 0
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" ${if_found} ${if_not_found}
+!macroend
+
 !macro GetPythonPath PYTHONVERSION un
 ; Function to detect the python path
 Function ${un}GetPythonPath${PYTHONVERSION}
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
-    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY_PYTHON ${PYTHONVERSION} registry_key_found 0
 
 !ifdef MISC_DEBUG
     MessageBox MB_OK "Python ${PYTHONVERSION} not found in registry."
@@ -914,13 +918,17 @@ Var PYTHONPATH${PYTHONVERSION}
 
 !ifdef MISC_MAYA
 
+!macro GET_REGISTRY_KEY_MAYA MAYAVERSION MAYAREGISTRY if_found if_not_found
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} ${if_not_found}
+!macroend
+
 !macro GetMayaPath PYTHONVERSION MAYAVERSION MAYAREGISTRY un
 ; Function to detect the maya path
 Function ${un}GetMayaPath${MAYAVERSION}
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY_MAYA ${MAYAVERSION} ${MAYAREGISTRY} registry_key_found 0
 
 !ifdef MISC_DEBUG
     MessageBox MB_OK "Maya ${MAYAVERSION} not found in registry."
@@ -999,6 +1007,14 @@ Var MAYAPATH${MAYAVERSION}
 
 !ifdef MISC_BLENDER
 
+!macro GET_REGISTRY_KEY_BLENDER if_found if_not_found
+    !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKLM SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} 0
+    !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKCU SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} 0
+    ; Blender 64 bit does not yet have a windows installer...
+    ;!insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKLM SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} 0
+    ;!insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKCU SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} ${if_not_found}
+!macroend
+
 ; Function to detect the blender path
 !macro GetBlenderPath un
 Function ${un}GetBlenderPath
@@ -1007,13 +1023,13 @@ Function ${un}GetBlenderPath
   StrCpy $BLENDERSCRIPTS ""
   StrCpy $BLENDERINST ""
 
-  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKLM SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
-  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKCU SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
-  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKLM SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
-  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKCU SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY_BLENDER registry_key_found 0
 
-     ; no key, that means that Blender is not installed
-     Goto blender_scripts_not_found
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Blender not found in registry."
+!endif
+
+    Goto blender_scripts_not_found
 
 registry_key_found:
   StrCpy $BLENDERINST $BLENDERHOME
