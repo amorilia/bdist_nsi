@@ -1007,26 +1007,15 @@ Function ${un}GetBlenderPath
   StrCpy $BLENDERSCRIPTS ""
   StrCpy $BLENDERINST ""
 
-  ClearErrors
-
-  ; first check the 32 bit registry
-  SetRegView 32
-  ReadRegStr $BLENDERHOME HKLM SOFTWARE\BlenderFoundation "Install_Dir"
-  IfErrors 0 blender_registry_check_end
-  ReadRegStr $BLENDERHOME HKCU SOFTWARE\BlenderFoundation "Install_Dir"
-  IfErrors 0 blender_registry_check_end
-
-  ; now check the 64 bit registry
-  SetRegView 64
-  ReadRegStr $BLENDERHOME HKLM SOFTWARE\BlenderFoundation "Install_Dir"
-  IfErrors 0 blender_registry_check_end
-  ReadRegStr $BLENDERHOME HKCU SOFTWARE\BlenderFoundation "Install_Dir"
-  IfErrors 0 blender_registry_check_end
+  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKLM SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
+  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKCU SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
+  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKLM SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
+  !insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKCU SOFTWARE\BlenderFoundation "Install_Dir" registry_key_found 0
 
      ; no key, that means that Blender is not installed
      Goto blender_scripts_not_found
 
-blender_registry_check_end:
+registry_key_found:
   StrCpy $BLENDERINST $BLENDERHOME
 
   ; get Blender scripts dir
