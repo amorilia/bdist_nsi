@@ -138,6 +138,22 @@ class AppInfo:
             else:
                 yield int(major), int(minor), bits
 
+    @classmethod
+    def make_apps(cls, versions, bits=None):
+        """Get all applications of maya that match given python versions,
+        which is a list of the form ["2.3", "2.4"] etc.
+
+        >>> MayaAppInfo.make_apps(["2.6"])
+        [MayaAppInfo(version=2010, py_major=2, py_minor=6, bits=32), MayaAppInfo(version=2010, py_major=2, py_minor=6, bits=64)]
+        >>> BlenderAppInfo.make_apps(["2.6"])
+        [BlenderAppInfo(version='2.49b', py_major=2, py_minor=6, bits=32)]
+        """
+        major_minor_bits = list(
+            cls.make_major_minor_bits_tuples(versions, bits))
+        return [
+            cls(*args) for args in cls.VERSIONS
+            if tuple(args[-3:]) in major_minor_bits]
+
 class PythonAppInfo(AppInfo):
     r"""Python application info.
 
@@ -203,13 +219,13 @@ class PythonAppInfo(AppInfo):
                 % (self.major, self.minor, self.bits))
 
     @classmethod
-    def make_python_apps(cls, versions=None, bits=None):
+    def make_apps(cls, versions=None, bits=None):
         """Get all applications of python that match versions, which is
         a list of the form ["2.3", "2.4"] etc.
 
-        >>> PythonAppInfo.make_python_apps(["2.1", "2.2"])
+        >>> PythonAppInfo.make_apps(["2.1", "2.2"])
         [PythonAppInfo(major=2, minor=1, bits=32), PythonAppInfo(major=2, minor=1, bits=64), PythonAppInfo(major=2, minor=2, bits=32), PythonAppInfo(major=2, minor=2, bits=64)]
-        >>> PythonAppInfo.make_python_apps(["2.3", "3.0"], bits=32)
+        >>> PythonAppInfo.make_apps(["2.3", "3.0"], bits=32)
         [PythonAppInfo(major=2, minor=3, bits=32), PythonAppInfo(major=3, minor=0, bits=32)]
         """
         major_minor_bits = cls.make_major_minor_bits_tuples(versions, bits)
@@ -221,6 +237,131 @@ class PythonAppInfo(AppInfo):
         yield '!macro GET_PATH_EXTRA_CHECK_PYTHON_%s' % self.label
         yield '    !insertmacro GET_PATH_EXTRA_CHECK_PYTHON %s' % self.label
         yield '!macroend'
+
+
+class MayaAppInfo(AppInfo):
+    r"""Maya application info.
+
+    >>> print("\n".join(MayaAppInfo(version=2008, py_major=2, py_minor=5, bits=32).macro_get_registry_keys()))
+    !macro GET_REGISTRY_KEYS_maya_2008_32 if_found if_not_found
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKLM "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} ${if_not_found}
+    !macroend
+    >>> print("\n".join(MayaAppInfo(version=2008, py_major=2, py_minor=5, bits=64).macro_get_registry_keys()))
+    !macro GET_REGISTRY_KEYS_maya_2008_64 if_found if_not_found
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKLM "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKCU "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKLM "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKCU "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKLM "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} ${if_not_found}
+    !macroend
+    """
+
+    VERSIONS = [
+        (2008, 2, 5, 32),
+        (2008, 2, 5, 64),
+        (2009, 2, 5, 32),
+        (2009, 2, 5, 64),
+        (2010, 2, 6, 32),
+        (2010, 2, 6, 64),
+        ]
+    """All versions of maya, as (version, py_major, py_minor, bits)."""
+    
+    def __init__(self, version=None, py_major=None, py_minor=None, bits=None):
+        self.version = version
+        self.py_major = py_major
+        self.py_minor = py_minor
+        self.name = "Maya %i (%i bit)" % (version, bits)
+        self.label = "maya_%i_%i" % (version, bits)
+        key = (
+            r"SOFTWARE\Autodesk\Maya\%i\Setup\InstallPath" % version)
+        key_x64 = (
+            r"SOFTWARE\Autodesk\Maya\%i-x64\Setup\InstallPath" % version)
+        name = "MAYA_INSTALL_LOCATION"
+        if bits == 32:
+            self.regkeys = [
+                RegKey(view=bits, root="HKLM", key=key, name=name),
+                RegKey(view=bits, root="HKCU", key=key, name=name),
+                ]
+        else:
+            self.regkeys = [
+                RegKey(view=32, root="HKLM", key=key_x64, name=name),
+                RegKey(view=32, root="HKCU", key=key_x64, name=name),
+                RegKey(view=64, root="HKLM", key=key_x64, name=name),
+                RegKey(view=64, root="HKCU", key=key_x64, name=name),
+                RegKey(view=64, root="HKLM", key=key, name=name),
+                RegKey(view=64, root="HKCU", key=key, name=name),
+                ]
+
+    @property
+    def bits(self):
+        """32 or 64.
+
+        >>> MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=64).bits
+        64
+        >>> MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=32).bits
+        32
+        """
+        return self.regkeys[-1].view
+
+    def __repr__(self):
+        """String representation.
+
+        >>> MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=64)
+        MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=64)
+        """
+        return ("MayaAppInfo(version=%i, py_major=%i, py_minor=%i, bits=%i)"
+                % (self.version, self.py_major, self.py_minor, self.bits))
+
+class BlenderAppInfo(AppInfo):
+    r"""Blender application info.
+
+    >>> print("\n".join(BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=32).macro_get_registry_keys()))
+    !macro GET_REGISTRY_KEYS_blender_2_49b if_found if_not_found
+        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_49b 32 HKLM "SOFTWARE\\BlenderFoundation" "Install_Dir" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_49b 32 HKCU "SOFTWARE\\BlenderFoundation" "Install_Dir" ${if_found} ${if_not_found}
+    !macroend
+    """
+
+    VERSIONS = [
+        ("2.49b", 2, 6, 32),
+        ]
+    """All versions of blender, as (version, py_major, py_minor, bits)."""
+
+    def __init__(self, version=None, py_major=None, py_minor=None, bits=None):
+        self.version = version
+        self.name = "Blender %s (%i bit)" % (version, bits)
+        self.label = "blender_%s" % version.replace(".", "_")
+        self.py_major = py_major
+        self.py_minor = py_minor
+        key = r"SOFTWARE\\BlenderFoundation"
+        name = r"Install_Dir"
+        self.regkeys = [
+            RegKey(view=bits, root="HKLM", key=key, name=name),
+            RegKey(view=bits, root="HKCU", key=key, name=name),
+            ]
+
+    @property
+    def bits(self):
+        """32 or 64.
+
+        >>> BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=64).bits
+        64
+        >>> BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=32).bits
+        32
+        """
+        return self.regkeys[0].view
+
+    def __repr__(self):
+        """String representation.
+
+        >>> BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=64)
+        BlenderAppInfo(version='2.49b', py_major=2, py_minor=6, bits=64)
+        """
+        return ("BlenderAppInfo(version=%s, py_major=%s, py_minor=%s, bits=%s)"
+                % (repr(self.version),
+                   repr(self.py_major), repr(self.py_minor), repr(self.bits)))
 
 class bdist_nsi(Command):
 
@@ -794,9 +935,11 @@ class bdist_nsi(Command):
             
 # class bdist_nsi
 
-def get_nsi(pythonversions=None):
-    # list all python applications
-    python_apps = PythonAppInfo.make_python_apps(pythonversions)
+def get_nsi(pythonversions=None, bits=None):
+    # list all applications
+    python_apps = PythonAppInfo.make_apps(pythonversions, bits)
+    maya_apps = MayaAppInfo.make_apps(pythonversions, bits)
+    blender_apps = BlenderAppInfo.make_apps(pythonversions, bits)
 
     # list all maya versions
     mayaversions = [
