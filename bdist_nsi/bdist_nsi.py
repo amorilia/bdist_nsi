@@ -116,6 +116,11 @@ class AppInfo:
                    not_found_label))
         yield "!macroend"
 
+    def macro_get_path_extra_check(self):
+        """Returns NSIS script which validates a given path."""
+        # default: do nothing
+        return
+
     @staticmethod
     def make_major_minor_bits_tuples(versions, bits=None):
         """Convert string versions into tuple versions.
@@ -210,6 +215,12 @@ class PythonAppInfo(AppInfo):
         major_minor_bits = cls.make_major_minor_bits_tuples(versions, bits)
         return [PythonAppInfo(major=major, minor=minor, bits=bits)
                 for major, minor, bits in major_minor_bits]
+
+    def macro_get_path_extra_check(self):
+        """Returns NSIS script which validates the python path."""
+        yield '!macro GET_PATH_EXTRA_CHECK_PYTHON_%s' % self.label
+        yield '    !insertmacro GET_PATH_EXTRA_CHECK_PYTHON %s' % self.label
+        yield '!macroend'
 
 class bdist_nsi(Command):
 
@@ -1017,14 +1028,70 @@ FunctionEnd
 !endif
 
     SetRegView ${reg_view}
-    ClearErrors
+    ClearErrors ; TODO remove when everything uses GET_PATH macro
     ReadRegStr ${variable} ${reg_root} ${reg_key} "${reg_name}"
     IfErrors ${if_not_found} ${if_found}
-    StrCpy ${variable} ""
+    StrCpy ${variable} ""  ; TODO remove when everything uses GET_PATH macro
 !macroend
 
 """ + "\n\n".join(
     "\n".join(python_app.macro_get_registry_keys())
+    for python_app in python_apps) + """
+
+; get path
+!macro GET_PATH label
+
+    ; check registry
+    ClearErrors
+    !insertmacro GET_REGISTRY_KEYS_${label} registry_key_found_${label} 0
+    StrCpy $PATH_${label} ""
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "not found in registry"
+!endif
+
+    Goto get_path_end_${label}
+
+registry_key_found_${label}:
+
+    ; remove trailing backslash using the $EXEDIR trick
+    Push $PATH_${label}
+    Exch $EXEDIR
+    Exch $EXEDIR
+    Pop $PATH_${label}
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "found at $PATH_${label}"
+!endif
+
+    !insertmacro GET_PATH_EXTRA_CHECK_${label}
+
+get_path_end_${label}:
+
+!macroend
+
+; validates python path
+!macro GET_PATH_EXTRA_CHECK_PYTHON label
+
+    IfFileExists "$PATH_${label}\\python.exe" 0 python_exe_not_found_${label}
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Found Python executable at $PATH_${label}\\python.exe."
+!endif
+
+    GoTo get_path_end_${label}
+
+python_exe_not_found_${label}:
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "Python executable not found."
+!endif
+
+    StrCpy $PATH_${label} ""
+!macroend
+
+""" + "\n\n".join(
+    "\n".join(python_app.macro_get_path_extra_check())
     for python_app in python_apps) + """
 
 !macro GET_REGISTRY_KEY_PYTHON PYTHONVERSION if_found if_not_found
