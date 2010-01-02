@@ -335,6 +335,21 @@ class MayaAppInfo(AppInfo):
         return ("MayaAppInfo(version=%i, py_major=%i, py_minor=%i, bits=%i)"
                 % (self.version, self.py_major, self.py_minor, self.bits))
 
+    def macro_get_path_extra_check(self):
+        """Returns NSIS script which validates the python path."""
+        yield '!macro GET_PATH_EXTRA_CHECK_%s' % self.label
+        yield '    !insertmacro GET_PATH_EXTRA_CHECK_MAYA %s' % self.label
+        yield '!macroend'
+
+    def macro_section_extra(self):
+        """Returns NSIS script which sets up the installation variables
+        in the section definition.
+        """
+        yield '!macro SECTION_EXTRA_%s' % self.label
+        yield ('    !insertmacro SECTION_EXTRA_MAYA %s %i %i'
+               % (self.label, self.py_major, self.py_minor))
+        yield '!macroend'
+
 class BlenderAppInfo(AppInfo):
     r"""Blender application info.
 
@@ -383,6 +398,26 @@ class BlenderAppInfo(AppInfo):
         return ("BlenderAppInfo(version=%s, py_major=%s, py_minor=%s, bits=%s)"
                 % (repr(self.version),
                    repr(self.py_major), repr(self.py_minor), repr(self.bits)))
+
+    def insertmacro_variables(self):
+        """Define variables."""
+        yield "var PATH_%s" % self.label
+        yield "var SCRIPTS_%s" % self.label
+
+    def macro_get_path_extra_check(self):
+        """Returns NSIS script which validates the python path."""
+        yield '!macro GET_PATH_EXTRA_CHECK_%s' % self.label
+        yield '    !insertmacro GET_PATH_EXTRA_CHECK_BLENDER %s' % self.label
+        yield '!macroend'
+
+    def macro_section_extra(self):
+        """Returns NSIS script which sets up the installation variables
+        in the section definition.
+        """
+        yield '!macro SECTION_EXTRA_%s' % self.label
+        yield ('    !insertmacro SECTION_EXTRA_BLENDER %s %i %i'
+               % (self.label, self.py_major, self.py_minor))
+        yield '!macroend'
 
 class bdist_nsi(Command):
 
@@ -961,23 +996,7 @@ def get_nsi(pythonversions=None, bits=None):
     python_apps = PythonAppInfo.make_apps(pythonversions, bits)
     maya_apps = MayaAppInfo.make_apps(pythonversions, bits)
     blender_apps = BlenderAppInfo.make_apps(pythonversions, bits)
-
-    # list all maya versions
-    mayaversions = [
-        ("2.5", "2008", "2008"),
-        ("2.5", "2008_x64", "2008-x64"),
-        ("2.5", "2009", "2009"),
-        ("2.5", "2009_x64", "2009-x64"),
-        ("2.6", "2010", "2010"),
-        ("2.6", "2010_x64", "2010-x64"),
-        ]
-
-    # filter maya versions    
-    mayaversions = [
-        (pythonversion, mayaversion, mayaregistry)
-        for pythonversion, mayaversion, mayaregistry in mayaversions
-        if pythonversion in pythonversions
-        ]
+    apps = python_apps + maya_apps + blender_apps
 
     NSI_HEADER = """\
 ; @name@ self-installer for Windows
@@ -1185,8 +1204,8 @@ FunctionEnd
 ; =========
 
 """ + "\n".join(
-    "\n".join(python_app.insertmacro_variables())
-    for python_app in python_apps) + """
+    "\n".join(app.insertmacro_variables())
+    for app in apps) + """
 
 ; Macros
 ; ======
@@ -1206,8 +1225,8 @@ FunctionEnd
 !macroend
 
 """ + "\n\n".join(
-    "\n".join(python_app.macro_get_registry_keys())
-    for python_app in python_apps) + """
+    "\n".join(app.macro_get_registry_keys())
+    for app in apps) + """
 
 ; get path
 !macro GET_PATH label
@@ -1247,7 +1266,7 @@ get_path_end_${label}:
     IfFileExists "$PATH_${label}\\python.exe" 0 python_exe_not_found_${label}
 
 !ifdef MISC_DEBUG
-    MessageBox MB_OK "Found Python executable at $PATH_${label}\\python.exe."
+    MessageBox MB_OK "found python executable at $PATH_${label}\\python.exe"
 !endif
 
     GoTo get_path_end_${label}
@@ -1255,15 +1274,15 @@ get_path_end_${label}:
 python_exe_not_found_${label}:
 
 !ifdef MISC_DEBUG
-    MessageBox MB_OK "Python executable not found."
+    MessageBox MB_OK "python executable not found"
 !endif
 
     StrCpy $PATH_${label} ""
 !macroend
 
 """ + "\n\n".join(
-    "\n".join(python_app.macro_get_path_extra_check())
-    for python_app in python_apps) + """
+    "\n".join(app.macro_get_path_extra_check())
+    for app in apps) + """
 
 !macro SECTION un name label
 Section "${un}${name}" ${un}section_${label}
@@ -1277,6 +1296,7 @@ section_end:
 SectionEnd
 !macroend
 
+; setup install vars for python
 !macro SECTION_EXTRA_PYTHON label major minor
     StrCpy $0 "$PATH_${label}"
     StrCpy $1 "$PATH_${label}\\python.exe"
@@ -1287,8 +1307,8 @@ SectionEnd
 !macroend
 
 """ + "\n\n".join(
-    "\n".join(python_app.macro_section_extra())
-    for python_app in python_apps) + """
+    "\n".join(app.macro_section_extra())
+    for app in apps) + """
 
 !macro SECTION_SET_PROPERTIES label
     SectionSetSize ${section_${label}} ${MISC_PYSIZEKB}
@@ -1301,87 +1321,34 @@ SectionEnd
 
 !ifdef MISC_MAYA
 
-!macro GET_REGISTRY_KEY_MAYA MAYAVERSION MAYAREGISTRY if_found if_not_found
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} ${if_not_found}
+; validates python path for maya
+!macro GET_PATH_EXTRA_CHECK_MAYA label
+    IfFileExists $PATH_${label}\\bin\\mayapy.exe 0 mayapy_exe_not_found_${label}
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "found python executable at $PATH_${label}\\bin\\mayapy.exe"
+!endif
+
+    GoTo get_path_end_${label}
+
+mayapy_exe_not_found_${label}:
+
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "python executable not found"
+!endif
+
+    StrCpy $PATH_${label} ""
 !macroend
 
-!macro GetMayaPath PYTHONVERSION MAYAVERSION MAYAREGISTRY un
-; Function to detect the maya path
-Function ${un}GetMayaPath${MAYAVERSION}
-    !insertmacro GET_REGISTRY_KEY_MAYA ${MAYAVERSION} ${MAYAREGISTRY} registry_key_found 0
 
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Maya ${MAYAVERSION} not found in registry."
-!endif
-
-    Goto maya_path_done
-
-registry_key_found:
-
-    ; remove trailing backslash using the $EXEDIR trick
-    Push $MAYAPATH${MAYAVERSION}
-    Exch $EXEDIR
-    Exch $EXEDIR
-    Pop $MAYAPATH${MAYAVERSION}
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Found Maya ${MAYAVERSION} path in registry: $MAYAPATH${MAYAVERSION}"
-!endif
-
-    IfFileExists $MAYAPATH${MAYAVERSION}\\bin\mayapy.exe 0 mayapy_exe_not_found
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Found Python executable for Maya ${MAYAVERSION} at $MAYAPATH${MAYAVERSION}\\bin\mayapy.exe."
-!endif
-
-    GoTo maya_path_done
-
-mayapy_exe_not_found:
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Python executable for Maya ${MAYAVERSION} not found."
-!endif
-
-    StrCpy $MAYAPATH${MAYAVERSION} ""
-
-maya_path_done:
-
-FunctionEnd
-!macroend ;GetMayaPath
-
-!macro MayaSectionDef PYTHONVERSION MAYAVERSION MAYAREGISTRY un
-; Install the library for Maya ${MAYAVERSION}
-Section ${un}"${MAYAVERSION}" ${un}Maya${MAYAVERSION}
-    SetShellVarContext all
-
-    StrCmp $MAYAPATH${MAYAVERSION} "" maya_install_end
-
-    StrCpy $0 "$MAYAPATH${MAYAVERSION}\\Python"
-    StrCpy $1 "$MAYAPATH${MAYAVERSION}\\bin\\mayapy.exe"
-    StrCpy $2 "${PYTHONVERSION}"
-    StrCpy $3 "$MAYAPATH${MAYAVERSION}\\Python\\Lib\\site-packages"
+; setup install vars for maya
+!macro SECTION_EXTRA_MAYA label major minor
+    StrCpy $0 "$PATH_${label}\\Python"
+    StrCpy $1 "$PATH_${label}\\bin\\mayapy.exe"
+    StrCpy $2 "${major}.${minor}"
+    StrCpy $3 "$PATH_${label}\\Python\\Lib\\site-packages"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
-
-    Call ${un}InstallFiles
-
-maya_install_end:
-
-SectionEnd
-!macroend ;MayaSectionDef
-
-!macro MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
-Var MAYAPATH${MAYAVERSION}
-!insertmacro GetMayaPath ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} ""
-!insertmacro GetMayaPath ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} "un."
-!insertmacro MayaSectionDef ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} ""
-!macroend
-
-!macro un.MayaSection PYTHONVERSION MAYAVERSION MAYAREGISTRY
-!insertmacro MayaSectionDef ${PYTHONVERSION} ${MAYAVERSION} ${MAYAREGISTRY} "un."
 !macroend
 
 !endif ;MISC_MAYA
@@ -1390,38 +1357,19 @@ Var MAYAPATH${MAYAVERSION}
 
 !ifdef MISC_BLENDER
 
-!macro GET_REGISTRY_KEY_BLENDER if_found if_not_found
-    !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKLM SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} 0
-    !insertmacro GET_REGISTRY_KEY $BLENDERHOME 32 HKCU SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} 0
-    ; Blender 64 bit does not yet have a windows installer...
-    ;!insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKLM SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} 0
-    ;!insertmacro GET_REGISTRY_KEY $BLENDERHOME 64 HKCU SOFTWARE\BlenderFoundation "Install_Dir" ${if_found} ${if_not_found}
-!macroend
+; validates path for blender
+!macro GET_PATH_EXTRA_CHECK_BLENDER label
 
-; Function to detect the blender path
-!macro GetBlenderPath un
-Function ${un}GetBlenderPath
-  ; clear variables
-  StrCpy $BLENDERHOME ""
-  StrCpy $BLENDERSCRIPTS ""
-  StrCpy $BLENDERINST ""
+    IfFileExists $PATH_${label}\\blender.exe 0 blender_scripts_not_found
 
-    !insertmacro GET_REGISTRY_KEY_BLENDER registry_key_found 0
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Blender not found in registry."
-!endif
-
-    Goto blender_scripts_not_found
-
-registry_key_found:
-  StrCpy $BLENDERINST $BLENDERHOME
+  ; clear variable
+  StrCpy $SCRIPTS_${label} ""
 
   ; get Blender scripts dir
 
   ; first try Blender's global install dir
-  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
-  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+  StrCpy $SCRIPTS_${label} "$PATH_${label}\.blender\scripts"
+  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
 
 ; XXX check disabled for now - function should be non-interactive
 ;  ; check if we are running vista, if so, complain to user because scripts are not in the "safe" location
@@ -1439,20 +1387,20 @@ registry_key_found:
 
   ; now try Blender's application data directory (current user)
   SetShellVarContext current
-  StrCpy $BLENDERHOME "$APPDATA\Blender Foundation\Blender"
-  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
-  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+  StrCpy $SCRIPTS_${label} "$APPDATA\Blender Foundation\Blender\.blender\scripts"
+  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
   
   ; now try Blender's application data directory (everyone)
   SetShellVarContext all
-  StrCpy $BLENDERHOME "$APPDATA\Blender Foundation\Blender"
-  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
-  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+  StrCpy $SCRIPTS_${label} "$APPDATA\Blender Foundation\Blender\.blender\scripts"
+  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
 
   ; finally, try the %HOME% variable
-  ReadEnvStr $BLENDERHOME "HOME"
-  StrCpy $BLENDERSCRIPTS "$BLENDERHOME\.blender\scripts"
-  IfFileExists "$BLENDERSCRIPTS\*.*" blender_scripts_found 0
+  Push $0
+  ReadEnvStr $0 "HOME"
+  StrCpy $SCRIPTS_${label} "$0\.blender\scripts"
+  Pop $0
+  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
   
     ; all failed!
     GoTo blender_scripts_not_found
@@ -1460,67 +1408,32 @@ registry_key_found:
 blender_scripts_found:
 
     ; remove trailing backslash using the $EXEDIR trick
-    Push $BLENDERHOME
+    Push $SCRIPTS_${label}
     Exch $EXEDIR
     Exch $EXEDIR
-    Pop $BLENDERHOME
-    Push $BLENDERSCRIPTS
-    Exch $EXEDIR
-    Exch $EXEDIR
-    Pop $BLENDERSCRIPTS
-    Push $BLENDERINST
-    Exch $EXEDIR
-    Exch $EXEDIR
-    Pop $BLENDERINST
+    Pop $SCRIPTS_${label}
 
     ; debug
-    ;MessageBox MB_OK "Found Blender scripts in $BLENDERSCRIPTS"
+    ;MessageBox MB_OK "Found Blender scripts in $SCRIPTS_${label}"
 
-    IfFileExists $BLENDERINST\\blender.exe blender_scripts_done blender_scripts_not_found
+    GoTo blender_scripts_done
 
 blender_scripts_not_found:
 
-  StrCpy $BLENDERHOME ""
-  StrCpy $BLENDERSCRIPTS ""
-  StrCpy $BLENDERINST ""
+  StrCpy $SCRIPTS_${label} ""
+  StrCpy $PATH_${label} ""
 
 blender_scripts_done:
-
-FunctionEnd
 !macroend
 
-!macro BlenderSectionDef un
-; Install the library for Blender 
-Section ${un}Blender ${un}Blender
-    SetShellVarContext all
-
-    StrCmp $BLENDERSCRIPTS "" blender_install_end
-
+!macro SECTION_EXTRA_BLENDER label major minor
     StrCpy $0 "" ; XXX todo: set python path
     StrCpy $1 "" ; XXX todo: set python executable
-    StrCpy $2 "" ; XXX todo: set python version
-    StrCpy $3 "$BLENDERSCRIPTS\\bpymodules"
+    StrCpy $2 "${major}.${minor}"
+    StrCpy $3 "$SCRIPTS_${label}\\bpymodules"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
-    Call ${un}InstallFiles
-
-blender_install_end:
-
-SectionEnd
-!macroend ;BlenderSectionDef
-
-!macro BlenderSection
-Var BLENDERHOME    ; blender settings location
-Var BLENDERSCRIPTS ; blender scripts location ($BLENDERHOME/.blender/scripts)
-Var BLENDERINST    ; blender.exe location
-!insertmacro GetBlenderPath ""
-!insertmacro BlenderSectionDef ""
-!macroend ;BlenderSection
-
-!macro un.BlenderSection
-!insertmacro GetBlenderPath "un."
-!insertmacro BlenderSectionDef "un."
-!macroend ;un.BlenderSection
+!macroend
 
 !endif ;MISC_BLENDER
 
@@ -1670,54 +1583,23 @@ Function .onInit
 """ + "\n".join(
     "    !insertmacro SECTION_SET_PROPERTIES %s"
     % app.label for app in python_apps) + """
-
-  ; check maya versions
-
   !ifdef MISC_MAYA
-
-""" + "\n".join("""\
-  SectionSetSize ${Maya${MAYAVERSION}} ${MISC_PYSIZEKB}
-  Call GetMayaPath${MAYAVERSION}
-  StrCmp $MAYAPATH${MAYAVERSION} "" 0 +2
-  ; maya version not found, so disable that section
-  SectionSetFlags ${Maya${MAYAVERSION}} ${SF_RO}
-""".replace("${MAYAVERSION}", mayaversion)
-                for pythonversion, mayaversion, mayaregistry in mayaversions) + """
+""" + "\n".join(
+    "    !insertmacro SECTION_SET_PROPERTIES %s"
+    % app.label for app in maya_apps) + """
   !endif ;MISC_MAYA
-
   !ifdef MISC_BLENDER
-
-  SectionSetSize ${Blender} ${MISC_PYSIZEKB}
-  Call GetBlenderPath
-  StrCmp $BLENDERSCRIPTS "" 0 +2
-  ; blender version not found, so disable that section
-  SectionSetFlags ${Blender} ${SF_RO}
-
+""" + "\n".join(
+    "    !insertmacro SECTION_SET_PROPERTIES %s"
+    % app.label for app in blender_apps) + """
   !endif ;MISC_BLENDER
 
 FunctionEnd
 
 Function un.onInit
 """ + "\n".join(
-    "  !insertmacro GET_PATH %s" % app.label
-    for app in python_apps) + """
-
-
-  !ifdef MISC_MAYA
-
-""" + "\n".join("  Call un.GetMayaPath%s" % mayaversion
-                 for pythonversion, mayaversion, mayaregistry in mayaversions) + """
-""" + """
-  !endif ;MISC_MAYA
-
-
-
-  !ifdef MISC_BLENDER
-
-  Call un.GetBlenderPath
-
-  !endif ;MISC_BLENDER
-
+    "     !insertmacro GET_PATH %s" % app.label
+    for app in apps) + """
 FunctionEnd
 
 Section -Post
@@ -1778,20 +1660,26 @@ SectionEnd
             + "!ifdef MISC_MAYA\n"
             + "\nSectionGroup /e Maya\n"
             + "\n".join(
-                "!insertmacro MayaSection %s %s %s"
-                % (pythonversion, mayaversion, mayaregistry)
-                for pythonversion, mayaversion, mayaregistry in mayaversions)
+                '!insertmacro SECTION "" "%s" %s' % (app.name, app.label)
+                for app in maya_apps)
             + "\nSectionGroupEnd\n\n"
             + "\nSectionGroup /e un.Maya\n"
             + "\n".join(
-                "!insertmacro un.MayaSection %s %s %s"
-                % (pythonversion, mayaversion, mayaregistry)
-                for pythonversion, mayaversion, mayaregistry in mayaversions)
+                '!insertmacro SECTION "un." "%s" %s' % (app.name, app.label)
+                for app in maya_apps)
             + "\nSectionGroupEnd\n\n"
             + "!endif ;MISC_MAYA\n\n\n"
             + "!ifdef MISC_BLENDER\n"
-            + "!insertmacro BlenderSection\n"
-            + "!insertmacro un.BlenderSection\n"
+            + "\nSectionGroup /e Blender\n"
+            + "\n".join(
+                '!insertmacro SECTION "" "%s" %s' % (app.name, app.label)
+                for app in blender_apps)
+            + "\nSectionGroupEnd\n\n"
+            + "\nSectionGroup /e un.Python\n"
+            + "\n".join(
+                '!insertmacro SECTION "un." "%s" %s' % (app.name, app.label)
+                for app in blender_apps)
+            + "\nSectionGroupEnd\n\n\n"
             + "!endif ;MISC_BLENDER\n\n\n"
             + NSI_FOOTER)
 
