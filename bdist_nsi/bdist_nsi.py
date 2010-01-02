@@ -1415,3 +1415,7 @@ SectionEnd
             + "!insertmacro un.BlenderSection\n"
             + "!endif ;MISC_BLENDER\n\n\n"
             + NSI_FOOTER)
+
+if __name__=='__main__':
+    import doctest
+    doctest.testmod()
