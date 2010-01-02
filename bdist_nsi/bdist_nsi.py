@@ -99,9 +99,9 @@ class AppInfo:
         ...               py_major=3, py_minor=2)
         >>> print("\n".join(app.macro_get_registry_keys()))
         !macro GET_REGISTRY_KEYS_test if_found if_not_found
-            !insertmacro GET_REGISTRY_KEY Test test 32 HKLM "Software\BlenderFoundation" "Install_Dir" ${if_found} 0
-            !insertmacro GET_REGISTRY_KEY Test test 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-            !insertmacro GET_REGISTRY_KEY Test test 32 HKCR "NSIS.Header" "DefaultIcon" ${if_found} ${if_not_found}
+            !insertmacro GET_REGISTRY_KEY $PATH_test 32 HKLM "Software\BlenderFoundation" "Install_Dir" ${if_found} 0
+            !insertmacro GET_REGISTRY_KEY $PATH_test 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
+            !insertmacro GET_REGISTRY_KEY $PATH_test 32 HKCR "NSIS.Header" "DefaultIcon" ${if_found} ${if_not_found}
         !macroend
         """
         yield "!macro GET_REGISTRY_KEYS_%s if_found if_not_found" % self.label
@@ -109,12 +109,95 @@ class AppInfo:
             ["0"] * (len(self.regkeys) - 1) + ["${if_not_found}"])
         for regkey, not_found_label in zip(self.regkeys, not_found_labels):
             yield (
-                '    !insertmacro GET_REGISTRY_KEY %s %s %s %s "%s" "%s"'
+                '    !insertmacro GET_REGISTRY_KEY $PATH_%s %s %s "%s" "%s"'
                 ' ${if_found} %s'
-                % (self.name, self.label,
+                % (self.label,
                    regkey.view, regkey.root, regkey.key, regkey.name,
                    not_found_label))
         yield "!macroend"
+
+class PythonAppInfo(AppInfo):
+    r"""Python application info.
+
+    >>> print("\n".join(PythonAppInfo(major=2, minor=5, bits=32).macro_get_registry_keys()))
+    !macro GET_REGISTRY_KEYS_python_2_5_32 if_found if_not_found
+        !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKLM "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKCU "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found} ${if_not_found}
+    !macroend
+    """
+
+    PYTHON_VERSIONS = [
+        (2, 3, 32),
+        (2, 3, 64),
+        (2, 4, 32),
+        (2, 4, 64),
+        (2, 5, 32),
+        (2, 5, 64),
+        (2, 6, 32),
+        (2, 6, 64),
+        (2, 7, 32),
+        (2, 7, 64),
+        (3, 0, 32),
+        (3, 0, 64),
+        (3, 1, 32),
+        (3, 1, 64),
+        (3, 2, 32),
+        (3, 2, 64),
+        ]
+
+    def __init__(self, major=None, minor=None, bits=None):
+        r"""Constructor.
+
+        >>> print(AppInfo.__repr__(PythonAppInfo(major=2, minor=7, bits=64)))
+        AppInfo(name='Python 2.7 (64 bit)', label='python_2_7_64', regkeys=[RegKey(view=64, root='HKLM', key='SOFTWARE\\Python\\PythonCore\\2.7\\InstallPath', name=''), RegKey(view=64, root='HKCU', key='SOFTWARE\\Python\\PythonCore\\2.7\\InstallPath', name='')], py_major=2, py_minor=7)
+        """
+        self.py_major = major
+        self.py_minor = minor
+        self.name = "Python %i.%i (%i bit)" % (major, minor, bits)
+        self.label = "python_%i_%i_%i" % (major, minor, bits)
+        key = r"SOFTWARE\Python\PythonCore\%i.%i\InstallPath" % (major, minor)
+        self.regkeys = [
+            RegKey(view=bits, root="HKLM", key=key, name=""),
+            RegKey(view=bits, root="HKCU", key=key, name=""),
+            ]
+
+    @property
+    def bits(self):
+        """32 or 64.
+
+        >>> PythonAppInfo(major=2, minor=7, bits=64).bits
+        64
+        >>> PythonAppInfo(major=3, minor=1, bits=32).bits
+        32
+        """
+        return self.regkeys[0].view
+
+    @property
+    def major(self):
+        """Major python version.
+
+        >>> PythonAppInfo(major=2, minor=7, bits=64).major
+        2
+        """
+        return self.py_major
+
+    @property
+    def minor(self):
+        """Minor python version.
+
+        >>> PythonAppInfo(major=2, minor=7, bits=64).minor
+        7
+        """
+        return self.py_minor
+
+    def __repr__(self):
+        """String representation.
+
+        >>> PythonAppInfo(major=2, minor=7, bits=64)
+        PythonAppInfo(major=2, minor=7, bits=64)
+        """
+        return ("PythonAppInfo(major=%i, minor=%i, bits=%i)"
+                % (self.major, self.minor, self.bits))
 
 class bdist_nsi(Command):
 
