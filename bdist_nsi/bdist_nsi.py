@@ -814,47 +814,29 @@ FunctionEnd
 ; Macros
 ; ======
 
+
+; jumps to registry_key_found if the registry key is found
+!macro GET_REGISTRY_KEY variable reg_view reg_root reg_key reg_name if_found if_not_found
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "looking for ${reg_root}\\${reg_key}\\${reg_name} in ${reg_view} bit registry"
+!endif
+
+    SetRegView ${reg_view}
+    ClearErrors
+    ReadRegStr ${variable} ${reg_root} ${reg_key} "${reg_name}"
+    IfErrors ${if_not_found} ${if_found}
+    StrCpy ${variable} ""
+!macroend
+
+
+
 !macro GetPythonPath PYTHONVERSION un
 ; Function to detect the python path
 Function ${un}GetPythonPath${PYTHONVERSION}
-    ClearErrors
-
-    ; first check the 32 bit registry
-    SetRegView 32
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 32 bit registry key HKLM\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
-!endif
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors 0 python_registry_found
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 32 bit registry key HKCU\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
-!endif
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors 0 python_registry_found
-
-    ; now check the 64 bit registry
-    SetRegView 64
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 64 bit registry key HKLM\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
-!endif
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKLM "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors 0 python_registry_found
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 64 bit registry key HKCU\SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath"
-!endif
-
-    ReadRegStr $PYTHONPATH${PYTHONVERSION} HKCU "SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath" ""
-    IfErrors 0 python_registry_found
-
-    ; clean string just in case
-    StrCpy $PYTHONPATH${PYTHONVERSION} ""
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 32 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKLM SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY $PYTHONPATH${PYTHONVERSION} 64 HKCU SOFTWARE\Python\PythonCore\${PYTHONVERSION}\InstallPath "" registry_key_found 0
 
 !ifdef MISC_DEBUG
     MessageBox MB_OK "Python ${PYTHONVERSION} not found in registry."
@@ -862,7 +844,7 @@ Function ${un}GetPythonPath${PYTHONVERSION}
 
     Goto python_path_done
 
-python_registry_found:
+registry_key_found:
 
     ; remove trailing backslash using the $EXEDIR trick
     Push $PYTHONPATH${PYTHONVERSION}
