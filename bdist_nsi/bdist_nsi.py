@@ -917,44 +917,10 @@ Var PYTHONPATH${PYTHONVERSION}
 !macro GetMayaPath PYTHONVERSION MAYAVERSION MAYAREGISTRY un
 ; Function to detect the maya path
 Function ${un}GetMayaPath${MAYAVERSION}
-    ClearErrors
-
-    ; first check the 32 bit registry
-    SetRegView 32
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 32 bit registry key HKLM\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
-!endif
-
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
-    IfErrors 0 maya_registry_found
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 32 bit registry key HKCU\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
-!endif
-
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
-    IfErrors 0 maya_registry_found
-
-    ; now check the 64 bit registry
-    SetRegView 64
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 64 bit registry key HKLM\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
-!endif
-
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
-    IfErrors 0 maya_registry_found
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "Looking for 64 bit registry key HKCU\SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath\MAYA_INSTALL_LOCATION"
-!endif
-
-    ReadRegStr $MAYAPATH${MAYAVERSION} HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION"
-    IfErrors 0 maya_registry_found
-
-    ; clean string just in case
-    StrCpy $MAYAPATH${MAYAVERSION} ""
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 32 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKLM "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
+    !insertmacro GET_REGISTRY_KEY $MAYAPATH${MAYAVERSION} 64 HKCU "SOFTWARE\Autodesk\Maya\${MAYAREGISTRY}\Setup\InstallPath" "MAYA_INSTALL_LOCATION" registry_key_found 0
 
 !ifdef MISC_DEBUG
     MessageBox MB_OK "Maya ${MAYAVERSION} not found in registry."
@@ -962,7 +928,7 @@ Function ${un}GetMayaPath${MAYAVERSION}
 
     Goto maya_path_done
 
-maya_registry_found:
+registry_key_found:
 
     ; remove trailing backslash using the $EXEDIR trick
     Push $MAYAPATH${MAYAVERSION}
