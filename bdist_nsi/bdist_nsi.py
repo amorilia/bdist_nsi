@@ -6,7 +6,12 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 # Created 2005/05/24, j-cg , inspired by the bdist_wininst of the python
 # distribution
 
-# June/July 2009: further developed by Amorilia
+# June/July 2009 (Amorilia):
+#   - further developed, 2to3, blender, maya
+
+# December 2009/January 2010 (Amorilia):
+#   - added AppInfo classes for better implementation
+#   - added proper 64 bit support
 
 import sys, os, string
 import subprocess
