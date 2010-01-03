@@ -1400,10 +1400,7 @@ mayapy_exe_not_found_${label}:
     StrCpy $SCRIPTS_${label} ""
 
     ; get Blender scripts dir
-
-    ; first try Blender's global install dir
     !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$PATH_${label}\.blender\scripts" blender_scripts_found_in_install_dir_${label} 0
-
 ; extra sanity check during install: scripts not in default location, so warn, clean, and reinstall blender
 !ifndef __UNINSTALL__
     MessageBox MB_YESNO|MB_ICONEXCLAMATION "Blender's user data files (such as scripts) do not reside in Blender's installation directory. Blender will sometimes only find its scripts if Blender's user data files reside in Blender's installation directory.$\r$\n$\r$\nDo you wish to abort installation, and first reinstall Blender?" IDNO blender_scripts_notininstallfolder_${label}
