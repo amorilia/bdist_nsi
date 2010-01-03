@@ -1406,10 +1406,11 @@ mayapy_exe_not_found_${label}:
 
 ; extra sanity check during install: scripts not in default location, so warn, clean, and reinstall blender
 !ifndef __UNINSTALL__
-    MessageBox MB_YESNO|MB_ICONQUESTION "Blender's user data files (such as scripts) do not reside in Blender's installation directory. Blender will sometimes only find its scripts if Blender's user data files reside in Blender's installation directory. Do you wish to abort installation, and first reinstall Blender, selecting 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files?" IDNO blender_scripts_notininstallfolder_${label}
-    MessageBox MB_OK "Pressing OK will take you to the Blender download page. Please download and run the Blender windows installer. Select 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files. When you are done, rerun the installer."
+    MessageBox MB_YESNO|MB_ICONEXCLAMATION "Blender's user data files (such as scripts) do not reside in Blender's installation directory. Blender will sometimes only find its scripts if Blender's user data files reside in Blender's installation directory.$\r$\n$\r$\nDo you wish to abort installation, and first reinstall Blender?" IDNO blender_scripts_notininstallfolder_${label}
+    MessageBox MB_YESNO|MB_ICONQUESTION "Please reinstall Blender, and select 'Use the installation directory' when asked where to install Blender's user data files. When you are done, rerun this installer.$\r$\n$\r$\nVisit the Blender download page?"  IDNO blender_scripts_skip_blender_download_page_${label}
     StrCpy $0 "http://www.blender.org/download/get-blender/"
     Call openLinkNewWindow
+blender_scripts_skip_blender_download_page_${label}:
     Abort ; causes installer to quit
 blender_scripts_notininstallfolder_${label}:
 !endif
