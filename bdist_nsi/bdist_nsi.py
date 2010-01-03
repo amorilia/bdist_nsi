@@ -988,7 +988,7 @@ def get_nsi(pythonversions=None, bits=None):
     blender_apps = BlenderAppInfo.make_apps(pythonversions, bits)
     apps = python_apps + maya_apps + blender_apps
 
-    NSI_HEADER = """\
+    NSI_HEADER = r"""\
 ; @name@ self-installer for Windows
 ; (@name@ - @url@)
 ; (NSIS - http://nsis.sourceforge.net)
@@ -1033,7 +1033,7 @@ SetCompressor /SOLID lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "@installer_path@"
-InstallDir "$PROGRAMFILES\\${PRODUCT_NAME}"
+InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
 ShowInstDetails show
 ShowUnInstDetails show
 
@@ -1198,16 +1198,16 @@ FunctionEnd
 
 """ + "\n".join(
     "\n".join(app.insertmacro_variables())
-    for app in python_apps) + """
+    for app in python_apps) + r"""
 !ifdef MISC_MAYA
 """ + "\n".join(
     "\n".join(app.insertmacro_variables())
-    for app in maya_apps) + """
+    for app in maya_apps) + r"""
 !endif
 !ifdef MISC_BLENDER
 """ + "\n".join(
     "\n".join(app.insertmacro_variables())
-    for app in blender_apps) + """
+    for app in blender_apps) + r"""
 !endif
 
 ; Macros
@@ -1223,7 +1223,7 @@ FunctionEnd
 
 ; jumps to registry_key_found if the registry key is found
 !macro GET_REGISTRY_KEY variable reg_view reg_root reg_key reg_name if_found if_not_found
-    !insertmacro DEBUG_MSG "looking for ${reg_root}\\${reg_key}\\${reg_name} in ${reg_view} bit registry"
+    !insertmacro DEBUG_MSG "looking for ${reg_root}\${reg_key}\${reg_name} in ${reg_view} bit registry"
     SetRegView ${reg_view}
     ReadRegStr ${variable} ${reg_root} ${reg_key} "${reg_name}"
     IfErrors ${if_not_found} ${if_found}
@@ -1231,16 +1231,16 @@ FunctionEnd
 
 """ + "\n".join(
     "\n".join(app.macro_get_registry_keys())
-    for app in python_apps) + """
+    for app in python_apps) + r"""
 !ifdef MISC_MAYA
 """ + "\n".join(
     "\n".join(app.macro_get_registry_keys())
-    for app in maya_apps) + """
+    for app in maya_apps) + r"""
 !endif
 !ifdef MISC_BLENDER
 """ + "\n".join(
     "\n".join(app.macro_get_registry_keys())
-    for app in blender_apps) + """
+    for app in blender_apps) + r"""
 !endif
 
 ; get path
@@ -1270,8 +1270,8 @@ get_path_end_${label}:
 ; validates python path
 !macro GET_PATH_EXTRA_CHECK_PYTHON label
 
-    IfFileExists "$PATH_${label}\\python.exe" 0 python_exe_not_found_${label}
-    !insertmacro DEBUG_MSG "found python executable at $PATH_${label}\\python.exe"
+    IfFileExists "$PATH_${label}\python.exe" 0 python_exe_not_found_${label}
+    !insertmacro DEBUG_MSG "found python executable at $PATH_${label}\python.exe"
     GoTo get_path_end_${label}
 
 python_exe_not_found_${label}:
@@ -1282,16 +1282,16 @@ python_exe_not_found_${label}:
 
 """ + "\n".join(
     "\n".join(app.macro_get_path_extra_check())
-    for app in python_apps) + """
+    for app in python_apps) + r"""
 !ifdef MISC_MAYA
 """ + "\n".join(
     "\n".join(app.macro_get_path_extra_check())
-    for app in maya_apps) + """
+    for app in maya_apps) + r"""
 !endif
 !ifdef MISC_BLENDER
 """ + "\n".join(
     "\n".join(app.macro_get_path_extra_check())
-    for app in blender_apps) + """
+    for app in blender_apps) + r"""
 !endif
 
 !macro SECTION un name label
@@ -1307,25 +1307,25 @@ SectionEnd
 ; setup install vars for python
 !macro SECTION_EXTRA_PYTHON label py_version
     StrCpy $0 "$PATH_${label}"
-    StrCpy $1 "$PATH_${label}\\python.exe"
+    StrCpy $1 "$PATH_${label}\python.exe"
     StrCpy $2 "${py_version}"
-    StrCpy $3 "$PATH_${label}\\Lib\\site-packages"
-    StrCpy $4 "$PATH_${label}\\Scripts"
-    StrCpy $5 "$PATH_${label}\\Include"
+    StrCpy $3 "$PATH_${label}\Lib\site-packages"
+    StrCpy $4 "$PATH_${label}\Scripts"
+    StrCpy $5 "$PATH_${label}\Include"
 !macroend
 
 """ + "\n\n".join(
     "\n".join(app.macro_section_extra())
-    for app in python_apps) + """
+    for app in python_apps) + r"""
 !ifdef MISC_MAYA
 """ + "\n\n".join(
     "\n".join(app.macro_section_extra())
-    for app in maya_apps) + """
+    for app in maya_apps) + r"""
 !endif
 !ifdef MISC_BLENDER
 """ + "\n\n".join(
     "\n".join(app.macro_section_extra())
-    for app in blender_apps) + """
+    for app in blender_apps) + r"""
 !endif
 
 !macro SECTION_SET_PROPERTIES label
@@ -1341,8 +1341,8 @@ SectionEnd
 
 ; validates python path for maya
 !macro GET_PATH_EXTRA_CHECK_MAYA label
-    IfFileExists $PATH_${label}\\bin\\mayapy.exe 0 mayapy_exe_not_found_${label}
-    !insertmacro DEBUG_MSG "found python executable at $PATH_${label}\\bin\\mayapy.exe"
+    IfFileExists $PATH_${label}\bin\mayapy.exe 0 mayapy_exe_not_found_${label}
+    !insertmacro DEBUG_MSG "found python executable at $PATH_${label}\bin\mayapy.exe"
     GoTo get_path_end_${label}
 
 mayapy_exe_not_found_${label}:
@@ -1354,10 +1354,10 @@ mayapy_exe_not_found_${label}:
 
 ; setup install vars for maya
 !macro SECTION_EXTRA_MAYA label py_version
-    StrCpy $0 "$PATH_${label}\\Python"
-    StrCpy $1 "$PATH_${label}\\bin\\mayapy.exe"
+    StrCpy $0 "$PATH_${label}\Python"
+    StrCpy $1 "$PATH_${label}\bin\mayapy.exe"
     StrCpy $2 "${py_version}"
-    StrCpy $3 "$PATH_${label}\\Python\\Lib\\site-packages"
+    StrCpy $3 "$PATH_${label}\Python\Lib\site-packages"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
 !macroend
@@ -1377,24 +1377,24 @@ mayapy_exe_not_found_${label}:
 
 !macro CLEAN_ALL_STRAY_BLENDER_USER_DATA_FILES
     SetShellVarContext current
-    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$APPDATA\\Blender Foundation"
+    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$APPDATA\Blender Foundation"
     SetShellVarContext all
-    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$APPDATA\\Blender Foundation"
+    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$APPDATA\Blender Foundation"
     ReadEnvStr $0 "HOME"
-    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$0\\.blender"
+    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$0\.blender"
 !macroend
 
 !macro FILE_EXISTS_BLENDER_SCRIPTS label path if_found if_not_found
     !insertmacro DEBUG_MSG "checking for blender scripts ${path}"
     StrCpy $SCRIPTS_${label} "${path}"
-    IfFileExists "$SCRIPTS_${label}\\*.*" ${if_found} ${if_not_found}
+    IfFileExists "$SCRIPTS_${label}\*.*" ${if_found} ${if_not_found}
 !macroend
 
 ; validates path for blender
 !macro GET_PATH_EXTRA_CHECK_BLENDER label
 
-    IfFileExists $PATH_${label}\\blender.exe 0 blender_exe_not_found_${label}
-    !insertmacro DEBUG_MSG "found blender executable at $PATH_${label}\\blender.exe"
+    IfFileExists $PATH_${label}\blender.exe 0 blender_exe_not_found_${label}
+    !insertmacro DEBUG_MSG "found blender executable at $PATH_${label}\blender.exe"
 
     ; clear variable
     StrCpy $SCRIPTS_${label} ""
@@ -1402,7 +1402,7 @@ mayapy_exe_not_found_${label}:
     ; get Blender scripts dir
 
     ; first try Blender's global install dir
-    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$PATH_${label}\\.blender\\scripts" blender_scripts_found_in_install_dir_${label} 0
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$PATH_${label}\.blender\scripts" blender_scripts_found_in_install_dir_${label} 0
 
 ; extra sanity check during install: scripts not in default location, so warn, clean, and reinstall blender
 !ifndef __UNINSTALL__
@@ -1415,11 +1415,11 @@ mayapy_exe_not_found_${label}:
 blender_scripts_notininstallfolder_${label}:
 !endif
     SetShellVarContext current
-    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$APPDATA\\Blender Foundation\\Blender\\.blender\\scripts" blender_scripts_found_${label} 0
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$APPDATA\Blender Foundation\Blender\.blender\scripts" blender_scripts_found_${label} 0
     SetShellVarContext all
-    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$APPDATA\\Blender Foundation\\Blender\\.blender\\scripts" blender_scripts_found_${label} 0
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$APPDATA\Blender Foundation\Blender\.blender\scripts" blender_scripts_found_${label} 0
     ReadEnvStr $0 "HOME"
-    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$0\\.blender\\scripts" blender_scripts_found_${label} blender_scripts_not_found_${label}
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$0\.blender\scripts" blender_scripts_found_${label} blender_scripts_not_found_${label}
 
 blender_scripts_found_in_install_dir_${label}:
     ; extra cleaning if installing in default directory (only during install)
@@ -1449,7 +1449,7 @@ blender_scripts_done_${label}:
     StrCpy $0 "" ; XXX todo: set python path
     StrCpy $1 "" ; XXX todo: set python executable
     StrCpy $2 "${py_version}"
-    StrCpy $3 "$SCRIPTS_${label}\\bpymodules"
+    StrCpy $3 "$SCRIPTS_${label}\bpymodules"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
 !macroend
@@ -1536,7 +1536,7 @@ FunctionEnd
 !endif
 """
 
-    NSI_FOOTER = """
+    NSI_FOOTER = r"""
 ; Functions
 ; =========
 
@@ -1600,16 +1600,16 @@ Function .onInit
   ; check python versions
 """ + "\n".join(
     "    !insertmacro SECTION_SET_PROPERTIES %s"
-    % app.label for app in python_apps) + """
+    % app.label for app in python_apps) + r"""
   !ifdef MISC_MAYA
 """ + "\n".join(
     "    !insertmacro SECTION_SET_PROPERTIES %s"
-    % app.label for app in maya_apps) + """
+    % app.label for app in maya_apps) + r"""
   !endif ;MISC_MAYA
   !ifdef MISC_BLENDER
 """ + "\n".join(
     "    !insertmacro SECTION_SET_PROPERTIES %s"
-    % app.label for app in blender_apps) + """
+    % app.label for app in blender_apps) + r"""
   !endif ;MISC_BLENDER
 
 FunctionEnd
@@ -1617,22 +1617,22 @@ FunctionEnd
 Function un.onInit
 """ + "\n".join(
     '    !insertmacro GET_PATH %s' % app.label
-    for app in python_apps) + """
+    for app in python_apps) + r"""
     !ifdef MISC_MAYA
 """ + "\n".join(
     '        !insertmacro GET_PATH %s' % app.label
-    for app in maya_apps) + """
+    for app in maya_apps) + r"""
     !endif ;MISC_MAYA
     !ifdef MISC_BLENDER
 """ + "\n".join(
     '        !insertmacro GET_PATH %s' % app.label
-    for app in blender_apps) + """
+    for app in blender_apps) + r"""
     !endif ;MISC_BLENDER
 FunctionEnd
 
 Section -Post
   SetOutPath "$INSTDIR"
-  WriteUninstaller "$INSTDIR\\${PRODUCT_NAME}_uninstall.exe"
+  WriteUninstaller "$INSTDIR\${PRODUCT_NAME}_uninstall.exe"
   SetRegView ${PRODUCT_UNINST_REG_VIEW}
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\${PRODUCT_NAME}_uninstall.exe"
@@ -1667,7 +1667,7 @@ Section un.Post
   !insertmacro UnPostExtra
   !endif
 
-  Delete "$INSTDIR\\${PRODUCT_NAME}_uninstall.exe"
+  Delete "$INSTDIR\${PRODUCT_NAME}_uninstall.exe"
   RmDir "$INSTDIR"
   SetRegView ${PRODUCT_UNINST_REG_VIEW}
   DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
