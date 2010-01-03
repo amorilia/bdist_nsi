@@ -1021,6 +1021,9 @@ def get_nsi(pythonversions=None, bits=None):
 
 @debug@!define MISC_DEBUG "1"
 
+!ifdef MISC_BLENDER | MISC_MSVC2005 | MISC_MSVC2005SP1 | MISC_MSVC2008 | MISC_MSVC2008SP1
+!define REQUIREOPENLINKNEWWINDOW "1"
+!endif
 
 ; Various Settings
 ; ================
@@ -1195,28 +1198,50 @@ FunctionEnd
 
 """ + "\n".join(
     "\n".join(app.insertmacro_variables())
-    for app in apps) + """
+    for app in python_apps) + """
+!ifdef MISC_MAYA
+""" + "\n".join(
+    "\n".join(app.insertmacro_variables())
+    for app in maya_apps) + """
+!endif
+!ifdef MISC_BLENDER
+""" + "\n".join(
+    "\n".join(app.insertmacro_variables())
+    for app in blender_apps) + """
+!endif
 
 ; Macros
 ; ======
 
 
-; jumps to registry_key_found if the registry key is found
-!macro GET_REGISTRY_KEY variable reg_view reg_root reg_key reg_name if_found if_not_found
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "looking for ${reg_root}\\${reg_key}\\${reg_name} in ${reg_view} bit registry"
-!endif
 
-    SetRegView ${reg_view}
-    ClearErrors ; TODO remove when everything uses GET_PATH macro
-    ReadRegStr ${variable} ${reg_root} ${reg_key} "${reg_name}"
-    IfErrors ${if_not_found} ${if_found}
-    StrCpy ${variable} ""  ; TODO remove when everything uses GET_PATH macro
+!macro DEBUG_MSG text
+!ifdef MISC_DEBUG
+    MessageBox MB_OK "${text}"
+!endif
 !macroend
 
-""" + "\n\n".join(
+; jumps to registry_key_found if the registry key is found
+!macro GET_REGISTRY_KEY variable reg_view reg_root reg_key reg_name if_found if_not_found
+    !insertmacro DEBUG_MSG "looking for ${reg_root}\\${reg_key}\\${reg_name} in ${reg_view} bit registry"
+    SetRegView ${reg_view}
+    ReadRegStr ${variable} ${reg_root} ${reg_key} "${reg_name}"
+    IfErrors ${if_not_found} ${if_found}
+!macroend
+
+""" + "\n".join(
     "\n".join(app.macro_get_registry_keys())
-    for app in apps) + """
+    for app in python_apps) + """
+!ifdef MISC_MAYA
+""" + "\n".join(
+    "\n".join(app.macro_get_registry_keys())
+    for app in maya_apps) + """
+!endif
+!ifdef MISC_BLENDER
+""" + "\n".join(
+    "\n".join(app.macro_get_registry_keys())
+    for app in blender_apps) + """
+!endif
 
 ; get path
 !macro GET_PATH label
@@ -1225,11 +1250,7 @@ FunctionEnd
     ClearErrors
     !insertmacro GET_REGISTRY_KEYS_${label} registry_key_found_${label} 0
     StrCpy $PATH_${label} ""
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "not found in registry"
-!endif
-
+    !insertmacro DEBUG_MSG "not found in registry"
     Goto get_path_end_${label}
 
 registry_key_found_${label}:
@@ -1239,11 +1260,7 @@ registry_key_found_${label}:
     Exch $EXEDIR
     Exch $EXEDIR
     Pop $PATH_${label}
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "found at $PATH_${label}"
-!endif
-
+    !insertmacro DEBUG_MSG "found at $PATH_${label}"
     !insertmacro GET_PATH_EXTRA_CHECK_${label}
 
 get_path_end_${label}:
@@ -1254,35 +1271,36 @@ get_path_end_${label}:
 !macro GET_PATH_EXTRA_CHECK_PYTHON label
 
     IfFileExists "$PATH_${label}\\python.exe" 0 python_exe_not_found_${label}
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "found python executable at $PATH_${label}\\python.exe"
-!endif
-
+    !insertmacro DEBUG_MSG "found python executable at $PATH_${label}\\python.exe"
     GoTo get_path_end_${label}
 
 python_exe_not_found_${label}:
 
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "python executable not found"
-!endif
-
+    !insertmacro DEBUG_MSG "python executable not found"
     StrCpy $PATH_${label} ""
 !macroend
 
-""" + "\n\n".join(
+""" + "\n".join(
     "\n".join(app.macro_get_path_extra_check())
-    for app in apps) + """
+    for app in python_apps) + """
+!ifdef MISC_MAYA
+""" + "\n".join(
+    "\n".join(app.macro_get_path_extra_check())
+    for app in maya_apps) + """
+!endif
+!ifdef MISC_BLENDER
+""" + "\n".join(
+    "\n".join(app.macro_get_path_extra_check())
+    for app in blender_apps) + """
+!endif
 
 !macro SECTION un name label
 Section "${un}${name}" ${un}section_${label}
     SetShellVarContext all
-    StrCmp $PATH_${label} "" section_end
-
+    StrCmp $PATH_${label} "" section_end_${label}
     !insertmacro SECTION_EXTRA_${label}
-
     Call ${un}InstallFiles
-section_end:
+section_end_${label}:
 SectionEnd
 !macroend
 
@@ -1298,7 +1316,17 @@ SectionEnd
 
 """ + "\n\n".join(
     "\n".join(app.macro_section_extra())
-    for app in apps) + """
+    for app in python_apps) + """
+!ifdef MISC_MAYA
+""" + "\n\n".join(
+    "\n".join(app.macro_section_extra())
+    for app in maya_apps) + """
+!endif
+!ifdef MISC_BLENDER
+""" + "\n\n".join(
+    "\n".join(app.macro_section_extra())
+    for app in blender_apps) + """
+!endif
 
 !macro SECTION_SET_PROPERTIES label
     SectionSetSize ${section_${label}} ${MISC_PYSIZEKB}
@@ -1314,19 +1342,12 @@ SectionEnd
 ; validates python path for maya
 !macro GET_PATH_EXTRA_CHECK_MAYA label
     IfFileExists $PATH_${label}\\bin\\mayapy.exe 0 mayapy_exe_not_found_${label}
-
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "found python executable at $PATH_${label}\\bin\\mayapy.exe"
-!endif
-
+    !insertmacro DEBUG_MSG "found python executable at $PATH_${label}\\bin\\mayapy.exe"
     GoTo get_path_end_${label}
 
 mayapy_exe_not_found_${label}:
 
-!ifdef MISC_DEBUG
-    MessageBox MB_OK "python executable not found"
-!endif
-
+    !insertmacro DEBUG_MSG "python executable not found"
     StrCpy $PATH_${label} ""
 !macroend
 
@@ -1347,73 +1368,81 @@ mayapy_exe_not_found_${label}:
 
 !ifdef MISC_BLENDER
 
+!macro CLEAN_STRAY_BLENDER_USER_DATA_FILES path
+    !insertmacro DEBUG_MSG "checking for stray Blender user data files in ${path}"
+    IfFileExists "${path}" 0 +3
+    MessageBox MB_YESNO|MB_ICONQUESTION "Clean stray Blender user data files in ${path} (highly recommended)?" IDNO +2
+    RmDir /r "${path}"
+!macroend
+
+!macro CLEAN_ALL_STRAY_BLENDER_USER_DATA_FILES
+    SetShellVarContext current
+    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$APPDATA\\Blender Foundation"
+    SetShellVarContext all
+    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$APPDATA\\Blender Foundation"
+    ReadEnvStr $0 "HOME"
+    !insertmacro CLEAN_STRAY_BLENDER_USER_DATA_FILES "$0\\.blender"
+!macroend
+
+!macro FILE_EXISTS_BLENDER_SCRIPTS label path if_found if_not_found
+    !insertmacro DEBUG_MSG "checking for blender scripts ${path}"
+    StrCpy $SCRIPTS_${label} ${path}
+    IfFileExists "$SCRIPTS_${label}\\*.*" ${if_found} ${if_not_found}
+!macroend
+
 ; validates path for blender
 !macro GET_PATH_EXTRA_CHECK_BLENDER label
 
-    IfFileExists $PATH_${label}\\blender.exe 0 blender_scripts_not_found
+    IfFileExists $PATH_${label}\\blender.exe 0 blender_exe_not_found_${label}
+    !insertmacro DEBUG_MSG "found blender executable at $PATH_${label}\\blender.exe"
 
-  ; clear variable
-  StrCpy $SCRIPTS_${label} ""
+    ; clear variable
+    StrCpy $SCRIPTS_${label} ""
 
-  ; get Blender scripts dir
+    ; get Blender scripts dir
 
-  ; first try Blender's global install dir
-  StrCpy $SCRIPTS_${label} "$PATH_${label}\.blender\scripts"
-  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
+    ; first try Blender's global install dir
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$PATH_${label}\\.blender\\scripts" blender_scripts_found_in_install_dir_${label} 0
 
-; XXX check disabled for now - function should be non-interactive
-;  ; check if we are running vista, if so, complain to user because scripts are not in the "safe" location
-;  Call GetWindowsVersion
-;  Pop $0
-;  StrCmp $0 "Vista" 0 blender_scripts_notininstallfolder
-;  
-;    MessageBox MB_YESNO|MB_ICONQUESTION "You are running Windows Vista, but Blender's user data files (such as scripts) do not reside in Blender's installation directory. On Vista, Blender will sometimes only find its scripts if Blender's user data files reside in Blender's installation directory. Do you wish to abort installation, and first reinstall Blender, selecting 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files?" IDNO blender_scripts_notininstallfolder
-;    MessageBox MB_OK "Pressing OK will take you to the Blender download page. Please download and run the Blender windows installer. Select 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files. When you are done, rerun the ColladaCGF installer."
-;    StrCpy $0 "http://www.blender.org/download/get-blender/"
-;    Call openLinkNewWindow
-;    Abort ; causes installer to quit
-;
-;blender_scripts_notininstallfolder:
+; extra sanity check during install: scripts not in default location, so warn, clean, and reinstall blender
+!ifndef __UNINSTALL__
+    MessageBox MB_YESNO|MB_ICONQUESTION "Blender's user data files (such as scripts) do not reside in Blender's installation directory. Blender will sometimes only find its scripts if Blender's user data files reside in Blender's installation directory. Do you wish to abort installation, and first reinstall Blender, selecting 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files?" IDNO blender_scripts_notininstallfolder_${label}
+    !insertmacro CLEAN_ALL_STRAY_BLENDER_USER_DATA_FILES
+    MessageBox MB_OK "Pressing OK will take you to the Blender download page. Please download and run the Blender windows installer. Select 'Use the installation directory' when the Blender installer asks you to specify where to install Blender's user data files. When you are done, rerun the installer."
+    StrCpy $0 "http://www.blender.org/download/get-blender/"
+    Call openLinkNewWindow
+    Abort ; causes installer to quit
+blender_scripts_notininstallfolder_${label}:
+!endif
+    SetShellVarContext current
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$APPDATA\\Blender Foundation\\Blender\\.blender\\scripts" blender_scripts_found_${label} 0
+    SetShellVarContext all
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$APPDATA\\Blender Foundation\\Blender\\.blender\\scripts" blender_scripts_found_${label} 0
+    ReadEnvStr $0 "HOME"
+    !insertmacro FILE_EXISTS_BLENDER_SCRIPTS ${label} "$0\\.blender\\scripts" blender_scripts_found_${label} blender_scripts_not_found_${label}
 
-  ; now try Blender's application data directory (current user)
-  SetShellVarContext current
-  StrCpy $SCRIPTS_${label} "$APPDATA\Blender Foundation\Blender\.blender\scripts"
-  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
-  
-  ; now try Blender's application data directory (everyone)
-  SetShellVarContext all
-  StrCpy $SCRIPTS_${label} "$APPDATA\Blender Foundation\Blender\.blender\scripts"
-  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
+blender_scripts_found_in_install_dir_${label}:
+    ; extra cleaning if installing in default directory (only during install)
+!ifndef __UNINSTALL__
+    !insertmacro CLEAN_ALL_STRAY_BLENDER_USER_DATA_FILES
+!endif
 
-  ; finally, try the %HOME% variable
-  Push $0
-  ReadEnvStr $0 "HOME"
-  StrCpy $SCRIPTS_${label} "$0\.blender\scripts"
-  Pop $0
-  IfFileExists "$SCRIPTS_${label}\*.*" blender_scripts_found 0
-  
-    ; all failed!
-    GoTo blender_scripts_not_found
-
-blender_scripts_found:
-
+blender_scripts_found_${label}:
+    !insertmacro DEBUG_MSG "found blender scripts in $SCRIPTS_${label}"
     ; remove trailing backslash using the $EXEDIR trick
     Push $SCRIPTS_${label}
     Exch $EXEDIR
     Exch $EXEDIR
     Pop $SCRIPTS_${label}
+    GoTo blender_scripts_done_${label}
 
-    ; debug
-    ;MessageBox MB_OK "Found Blender scripts in $SCRIPTS_${label}"
+blender_exe_not_found_${label}:
+blender_scripts_not_found_${label}:
+    StrCpy $SCRIPTS_${label} ""
+    StrCpy $PATH_${label} ""
+    !insertmacro DEBUG_MSG "blender scripts not found"
 
-    GoTo blender_scripts_done
-
-blender_scripts_not_found:
-
-  StrCpy $SCRIPTS_${label} ""
-  StrCpy $PATH_${label} ""
-
-blender_scripts_done:
+blender_scripts_done_${label}:
 !macroend
 
 !macro SECTION_EXTRA_BLENDER label py_version
@@ -1439,7 +1468,6 @@ blender_scripts_done:
 
 Var DLLFound${DLLLABEL}
 
-!define REQUIREOPENLINKNEWWINDOW "1"
 Function Download${DLLLABEL}
   Push ${DLLLINK}
   MessageBox MB_OK "You will need to download ${DLLDESC}. Pressing OK will take you to the download page, please follow the instructions on the page that appears."
@@ -1588,8 +1616,18 @@ FunctionEnd
 
 Function un.onInit
 """ + "\n".join(
-    "     !insertmacro GET_PATH %s" % app.label
-    for app in apps) + """
+    '    !insertmacro GET_PATH %s' % app.label
+    for app in python_apps) + """
+    !ifdef MISC_MAYA
+""" + "\n".join(
+    '        !insertmacro GET_PATH %s' % app.label
+    for app in maya_apps) + """
+    !endif ;MISC_MAYA
+    !ifdef MISC_BLENDER
+""" + "\n".join(
+    '        !insertmacro GET_PATH %s' % app.label
+    for app in blender_apps) + """
+    !endif ;MISC_BLENDER
 FunctionEnd
 
 Section -Post
