@@ -372,7 +372,7 @@ class BlenderAppInfo(AppInfo):
         self.name = "Blender %s (%i bit)" % (version, bits)
         self.label = "blender_%s" % version.replace(".", "_")
         self.py_version = py_version
-        key = r"SOFTWARE\\BlenderFoundation"
+        key = r"SOFTWARE\BlenderFoundation"
         name = r"Install_Dir"
         self.regkeys = [
             RegKey(view=bits, root="HKLM", key=key, name=name),
@@ -1386,7 +1386,7 @@ mayapy_exe_not_found_${label}:
 
 !macro FILE_EXISTS_BLENDER_SCRIPTS label path if_found if_not_found
     !insertmacro DEBUG_MSG "checking for blender scripts ${path}"
-    StrCpy $SCRIPTS_${label} ${path}
+    StrCpy $SCRIPTS_${label} "${path}"
     IfFileExists "$SCRIPTS_${label}\\*.*" ${if_found} ${if_not_found}
 !macroend
 
@@ -1438,9 +1438,9 @@ blender_scripts_found_${label}:
 
 blender_exe_not_found_${label}:
 blender_scripts_not_found_${label}:
+    !insertmacro DEBUG_MSG "blender scripts not found"
     StrCpy $SCRIPTS_${label} ""
     StrCpy $PATH_${label} ""
-    !insertmacro DEBUG_MSG "blender scripts not found"
 
 blender_scripts_done_${label}:
 !macroend
