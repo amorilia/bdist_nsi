@@ -26,10 +26,18 @@ from distutils.command.install import WINDOWS_SCHEME
 
 class RegKey:
     """Stores the location of a registry key."""
+
     view = None
+    """Registry view (32 or 64)."""
+
     root = None
+    """Root of the key (HKLM, HKCU, and so on)."""
+    
     key = None
+    """Key."""
+
     name = None
+    """Name."""
 
     def __init__(self, view=None, root=None, key=None, name=None):
         """Initialize key."""
@@ -51,23 +59,36 @@ class RegKey:
                repr(self.key), repr(self.name)))
 
 class AppInfo:
-    """Information of an application which integrates Python (possibly,
-    Python itself).
-    """
-    name = None
-    label = None
-    regkeys = None  # list of registry keys
-    py_major = None # 1, 2, 3, ...
-    py_minor = None # minor python version
+    """Information of an application which integrates Python."""
 
-    def __init__(self, name=None, label=None, regkeys=None,
-                 py_major=None, py_minor=None):
+    name = None
+    """Name of the application."""
+
+    version = None
+    """The version of the application."""
+
+    label = None
+    """A label which uniquely identifies the application."""
+
+    regkeys = None  # list of registry keys
+    """List of registry keys which are checked to determine whether the
+    application is installed or not, and to get its installation path.
+    """
+    
+    py_version = None # 2.4, 2.5, ...
+    """A string of the form 'x.x' which determines the Python version
+    for this application.
+    """
+
+    VERSIONS = []
+    """List of (version, py_version, bits) tuples."""
+
+    def __init__(self, name=None, label=None, regkeys=None, py_version=None):
         """Initialize application information."""
         self.name = name
         self.label = label
         self.regkeys = regkeys
-        self.py_major = py_major
-        self.py_minor = py_minor
+        self.py_version = py_version
 
     def __repr__(self):
         r"""Return string representation.
@@ -76,13 +97,32 @@ class AppInfo:
         ...                 key=r"Software\BlenderFoundation",
         ...                 name="Install_Dir")
         >>> AppInfo(name="Test", label="test", regkeys=[regkey],
-        ...         py_major=3, py_minor=2)
-        AppInfo(name='Test', label='test', regkeys=[RegKey(view=32, root='HKLM', key='Software\\BlenderFoundation', name='Install_Dir')], py_major=3, py_minor=2)
+        ...         py_version="3.2")
+        AppInfo(name='Test', label='test', regkeys=[RegKey(view=32, root='HKLM', key='Software\\BlenderFoundation', name='Install_Dir')], py_version='3.2')
         """
         return (
-            "AppInfo(name=%s, label=%s, regkeys=%s, py_major=%s, py_minor=%s)"
+            "AppInfo(name=%s, label=%s, regkeys=%s, py_version=%s)"
             % (repr(self.name), repr(self.label), repr(self.regkeys),
-               repr(self.py_major), repr(self.py_minor)))
+               repr(self.py_version)))
+
+    @property
+    def bits(self):
+        """32 or 64.
+
+        >>> PythonAppInfo(version="2.7", bits=64).bits
+        64
+        >>> PythonAppInfo(version="3.1", bits=32).bits
+        32
+        >>> MayaAppInfo(version="2009", py_version="2.5", bits=64).bits
+        64
+        >>> MayaAppInfo(version="2009", py_version="2.5", bits=32).bits
+        32
+        >>> BlenderAppInfo(version="2.49b", py_version="2.6", bits=64).bits
+        64
+        >>> BlenderAppInfo(version="2.49b", py_version="2.6", bits=32).bits
+        32
+        """
+        return max(regkey.view for regkey in self.regkeys)
 
     def macro_get_registry_keys(self):
         r"""Returns NSIS script which defines a macro which jumps to
@@ -101,7 +141,7 @@ class AppInfo:
         ...                  name="DefaultIcon")
         >>> app = AppInfo(name="Test", label="test",
         ...               regkeys=[regkey1, regkey2, regkey3],
-        ...               py_major=3, py_minor=2)
+        ...               py_version='3.2')
         >>> print("\n".join(app.macro_get_registry_keys()))
         !macro GET_REGISTRY_KEYS_test if_found if_not_found
             !insertmacro GET_REGISTRY_KEY $PATH_test 32 HKLM "Software\BlenderFoundation" "Install_Dir" ${if_found} 0
@@ -131,25 +171,27 @@ class AppInfo:
         yield "var PATH_%s" % self.label
 
     def macro_section_extra(self):
-        """Define section."""
+        """Define section install variables $0 to $5 (see the
+        implementation of PythonAppInfo.macro_section_extra for an
+        example).
+        """
         raise NotImplementedError
 
     @staticmethod
-    def make_major_minor_bits_tuples(versions, bits=None):
+    def make_version_bits_tuples(versions, bits=None):
         """Convert string versions into tuple versions.
 
-        >>> list(AppInfo.make_major_minor_bits_tuples(["2.5", "3.1"]))
-        [(2, 5, 32), (2, 5, 64), (3, 1, 32), (3, 1, 64)]
-        >>> list(AppInfo.make_major_minor_bits_tuples(["2.5", "3.1"], bits=64))
-        [(2, 5, 64), (3, 1, 64)]
+        >>> list(AppInfo.make_version_bits_tuples(["2.5", "3.1"]))
+        [('2.5', 32), ('2.5', 64), ('3.1', 32), ('3.1', 64)]
+        >>> list(AppInfo.make_version_bits_tuples(["2.5", "3.1"], bits=64))
+        [('2.5', 64), ('3.1', 64)]
         """
         for version in versions:
-            major, minor = version.split(".")
             if bits is None:
                 for bits_ in [32, 64]:
-                    yield int(major), int(minor), bits_
+                    yield version, bits_
             else:
-                yield int(major), int(minor), bits
+                yield version, bits
 
     @classmethod
     def make_apps(cls, versions, bits=None):
@@ -157,79 +199,51 @@ class AppInfo:
         which is a list of the form ["2.3", "2.4"] etc.
 
         >>> MayaAppInfo.make_apps(["2.6"])
-        [MayaAppInfo(version=2010, py_major=2, py_minor=6, bits=32), MayaAppInfo(version=2010, py_major=2, py_minor=6, bits=64)]
+        [MayaAppInfo(version='2010', py_version='2.6', bits=32), MayaAppInfo(version='2010', py_version='2.6', bits=64)]
         >>> BlenderAppInfo.make_apps(["2.6"])
-        [BlenderAppInfo(version='2.49b', py_major=2, py_minor=6, bits=32)]
+        [BlenderAppInfo(version='2.49b', py_version='2.6', bits=32)]
         """
-        major_minor_bits = list(
-            cls.make_major_minor_bits_tuples(versions, bits))
+        version_bits = list(
+            cls.make_version_bits_tuples(versions, bits))
         return [
             cls(*args) for args in cls.VERSIONS
-            if tuple(args[-3:]) in major_minor_bits]
+            if tuple(args[-2:]) in version_bits]
 
 class PythonAppInfo(AppInfo):
     r"""Python application info.
 
-    >>> print("\n".join(PythonAppInfo(major=2, minor=5, bits=32).macro_get_registry_keys()))
+    >>> print("\n".join(PythonAppInfo(version="2.5", bits=32).macro_get_registry_keys()))
     !macro GET_REGISTRY_KEYS_python_2_5_32 if_found if_not_found
         !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKLM "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found} 0
         !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKCU "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found} ${if_not_found}
     !macroend
     """
 
-    def __init__(self, major=None, minor=None, bits=None):
+    def __init__(self, version=None, bits=None):
         r"""Constructor.
 
-        >>> print(AppInfo.__repr__(PythonAppInfo(major=2, minor=7, bits=64)))
-        AppInfo(name='Python 2.7 (64 bit)', label='python_2_7_64', regkeys=[RegKey(view=64, root='HKLM', key='SOFTWARE\\Python\\PythonCore\\2.7\\InstallPath', name=''), RegKey(view=64, root='HKCU', key='SOFTWARE\\Python\\PythonCore\\2.7\\InstallPath', name='')], py_major=2, py_minor=7)
+        >>> print(AppInfo.__repr__(PythonAppInfo(version="2.7", bits=64)))
+        AppInfo(name='Python 2.7 (64 bit)', label='python_2_7_64', regkeys=[RegKey(view=64, root='HKLM', key='SOFTWARE\\Python\\PythonCore\\2.7\\InstallPath', name=''), RegKey(view=64, root='HKCU', key='SOFTWARE\\Python\\PythonCore\\2.7\\InstallPath', name='')], py_version='2.7')
+        >>> PythonAppInfo(version="2.7", bits=64).py_version
+        '2.7'
         """
-        self.py_major = major
-        self.py_minor = minor
-        self.name = "Python %i.%i (%i bit)" % (major, minor, bits)
-        self.label = "python_%i_%i_%i" % (major, minor, bits)
-        key = r"SOFTWARE\Python\PythonCore\%i.%i\InstallPath" % (major, minor)
+        self.py_version = version
+        self.name = "Python %s (%i bit)" % (self.py_version, bits)
+        self.label = "python_%s_%i" % (self.py_version.replace(".", "_"), bits)
+        key = r"SOFTWARE\Python\PythonCore\%s\InstallPath" % self.py_version
         self.regkeys = [
             RegKey(view=bits, root="HKLM", key=key, name=""),
             RegKey(view=bits, root="HKCU", key=key, name=""),
             ]
 
-    @property
-    def bits(self):
-        """32 or 64.
-
-        >>> PythonAppInfo(major=2, minor=7, bits=64).bits
-        64
-        >>> PythonAppInfo(major=3, minor=1, bits=32).bits
-        32
-        """
-        return self.regkeys[0].view
-
-    @property
-    def major(self):
-        """Major python version.
-
-        >>> PythonAppInfo(major=2, minor=7, bits=64).major
-        2
-        """
-        return self.py_major
-
-    @property
-    def minor(self):
-        """Minor python version.
-
-        >>> PythonAppInfo(major=2, minor=7, bits=64).minor
-        7
-        """
-        return self.py_minor
-
     def __repr__(self):
         """String representation.
 
-        >>> PythonAppInfo(major=2, minor=7, bits=64)
-        PythonAppInfo(major=2, minor=7, bits=64)
+        >>> PythonAppInfo(version="2.7", bits=64)
+        PythonAppInfo(version='2.7', bits=64)
         """
-        return ("PythonAppInfo(major=%i, minor=%i, bits=%i)"
-                % (self.major, self.minor, self.bits))
+        return ("PythonAppInfo(version=%s, bits=%i)"
+                % (repr(self.py_version), self.bits))
 
     @classmethod
     def make_apps(cls, versions=None, bits=None):
@@ -237,13 +251,13 @@ class PythonAppInfo(AppInfo):
         a list of the form ["2.3", "2.4"] etc.
 
         >>> PythonAppInfo.make_apps(["2.1", "2.2"])
-        [PythonAppInfo(major=2, minor=1, bits=32), PythonAppInfo(major=2, minor=1, bits=64), PythonAppInfo(major=2, minor=2, bits=32), PythonAppInfo(major=2, minor=2, bits=64)]
+        [PythonAppInfo(version='2.1', bits=32), PythonAppInfo(version='2.1', bits=64), PythonAppInfo(version='2.2', bits=32), PythonAppInfo(version='2.2', bits=64)]
         >>> PythonAppInfo.make_apps(["2.3", "3.0"], bits=32)
-        [PythonAppInfo(major=2, minor=3, bits=32), PythonAppInfo(major=3, minor=0, bits=32)]
+        [PythonAppInfo(version='2.3', bits=32), PythonAppInfo(version='3.0', bits=32)]
         """
-        major_minor_bits = cls.make_major_minor_bits_tuples(versions, bits)
-        return [PythonAppInfo(major=major, minor=minor, bits=bits)
-                for major, minor, bits in major_minor_bits]
+        version_bits = cls.make_version_bits_tuples(versions, bits)
+        return [PythonAppInfo(version=version, bits=bits)
+                for version, bits in version_bits]
 
     def macro_get_path_extra_check(self):
         """Returns NSIS script which validates the python path."""
@@ -256,19 +270,19 @@ class PythonAppInfo(AppInfo):
         in the section definition.
         """
         yield '!macro SECTION_EXTRA_%s' % self.label
-        yield ('    !insertmacro SECTION_EXTRA_PYTHON %s %i %i'
-               % (self.label, self.major, self.minor))
+        yield ('    !insertmacro SECTION_EXTRA_PYTHON %s %s'
+               % (self.label, self.py_version))
         yield '!macroend'
 
 class MayaAppInfo(AppInfo):
     r"""Maya application info.
 
-    >>> print("\n".join(MayaAppInfo(version=2008, py_major=2, py_minor=5, bits=32).macro_get_registry_keys()))
+    >>> print("\n".join(MayaAppInfo(version=2008, py_version="2.5", bits=32).macro_get_registry_keys()))
     !macro GET_REGISTRY_KEYS_maya_2008_32 if_found if_not_found
         !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKLM "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
         !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} ${if_not_found}
     !macroend
-    >>> print("\n".join(MayaAppInfo(version=2008, py_major=2, py_minor=5, bits=64).macro_get_registry_keys()))
+    >>> print("\n".join(MayaAppInfo(version=2008, py_version="2.5", bits=64).macro_get_registry_keys()))
     !macro GET_REGISTRY_KEYS_maya_2008_64 if_found if_not_found
         !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKLM "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
         !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKCU "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
@@ -280,25 +294,24 @@ class MayaAppInfo(AppInfo):
     """
 
     VERSIONS = [
-        (2008, 2, 5, 32),
-        (2008, 2, 5, 64),
-        (2009, 2, 5, 32),
-        (2009, 2, 5, 64),
-        (2010, 2, 6, 32),
-        (2010, 2, 6, 64),
+        ("2008", "2.5", 32),
+        ("2008", "2.5", 64),
+        ("2009", "2.5", 32),
+        ("2009", "2.5", 64),
+        ("2010", "2.6", 32),
+        ("2010", "2.6", 64),
         ]
-    """All versions of maya, as (version, py_major, py_minor, bits)."""
+    """All versions of maya, as (version, py_version, bits)."""
     
-    def __init__(self, version=None, py_major=None, py_minor=None, bits=None):
+    def __init__(self, version=None, py_version=None, bits=None):
         self.version = version
-        self.py_major = py_major
-        self.py_minor = py_minor
-        self.name = "Maya %i (%i bit)" % (version, bits)
-        self.label = "maya_%i_%i" % (version, bits)
+        self.py_version = py_version
+        self.name = "Maya %s (%i bit)" % (version, bits)
+        self.label = "maya_%s_%i" % (version, bits)
         key = (
-            r"SOFTWARE\Autodesk\Maya\%i\Setup\InstallPath" % version)
+            r"SOFTWARE\Autodesk\Maya\%s\Setup\InstallPath" % version)
         key_x64 = (
-            r"SOFTWARE\Autodesk\Maya\%i-x64\Setup\InstallPath" % version)
+            r"SOFTWARE\Autodesk\Maya\%s-x64\Setup\InstallPath" % version)
         name = "MAYA_INSTALL_LOCATION"
         if bits == 32:
             self.regkeys = [
@@ -315,25 +328,14 @@ class MayaAppInfo(AppInfo):
                 RegKey(view=64, root="HKCU", key=key, name=name),
                 ]
 
-    @property
-    def bits(self):
-        """32 or 64.
-
-        >>> MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=64).bits
-        64
-        >>> MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=32).bits
-        32
-        """
-        return self.regkeys[-1].view
-
     def __repr__(self):
         """String representation.
 
-        >>> MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=64)
-        MayaAppInfo(version=2009, py_major=2, py_minor=5, bits=64)
+        >>> MayaAppInfo(version="2009", py_version="2.5", bits=64)
+        MayaAppInfo(version='2009', py_version='2.5', bits=64)
         """
-        return ("MayaAppInfo(version=%i, py_major=%i, py_minor=%i, bits=%i)"
-                % (self.version, self.py_major, self.py_minor, self.bits))
+        return ("MayaAppInfo(version=%s, py_version=%s, bits=%i)"
+                % (repr(self.version), repr(self.py_version), self.bits))
 
     def macro_get_path_extra_check(self):
         """Returns NSIS script which validates the python path."""
@@ -346,14 +348,14 @@ class MayaAppInfo(AppInfo):
         in the section definition.
         """
         yield '!macro SECTION_EXTRA_%s' % self.label
-        yield ('    !insertmacro SECTION_EXTRA_MAYA %s %i %i'
-               % (self.label, self.py_major, self.py_minor))
+        yield ('    !insertmacro SECTION_EXTRA_MAYA %s %s'
+               % (self.label, self.py_version))
         yield '!macroend'
 
 class BlenderAppInfo(AppInfo):
     r"""Blender application info.
 
-    >>> print("\n".join(BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=32).macro_get_registry_keys()))
+    >>> print("\n".join(BlenderAppInfo(version="2.49b", py_version="2.6", bits=32).macro_get_registry_keys()))
     !macro GET_REGISTRY_KEYS_blender_2_49b if_found if_not_found
         !insertmacro GET_REGISTRY_KEY $PATH_blender_2_49b 32 HKLM "SOFTWARE\\BlenderFoundation" "Install_Dir" ${if_found} 0
         !insertmacro GET_REGISTRY_KEY $PATH_blender_2_49b 32 HKCU "SOFTWARE\\BlenderFoundation" "Install_Dir" ${if_found} ${if_not_found}
@@ -361,16 +363,15 @@ class BlenderAppInfo(AppInfo):
     """
 
     VERSIONS = [
-        ("2.49b", 2, 6, 32),
+        ("2.49b", "2.6", 32),
         ]
-    """All versions of blender, as (version, py_major, py_minor, bits)."""
+    """All versions of blender, as (version, py_version, bits)."""
 
-    def __init__(self, version=None, py_major=None, py_minor=None, bits=None):
+    def __init__(self, version=None, py_version=None, bits=None):
         self.version = version
         self.name = "Blender %s (%i bit)" % (version, bits)
         self.label = "blender_%s" % version.replace(".", "_")
-        self.py_major = py_major
-        self.py_minor = py_minor
+        self.py_version = py_version
         key = r"SOFTWARE\\BlenderFoundation"
         name = r"Install_Dir"
         self.regkeys = [
@@ -378,26 +379,15 @@ class BlenderAppInfo(AppInfo):
             RegKey(view=bits, root="HKCU", key=key, name=name),
             ]
 
-    @property
-    def bits(self):
-        """32 or 64.
-
-        >>> BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=64).bits
-        64
-        >>> BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=32).bits
-        32
-        """
-        return self.regkeys[0].view
-
     def __repr__(self):
         """String representation.
 
-        >>> BlenderAppInfo(version="2.49b", py_major=2, py_minor=6, bits=64)
-        BlenderAppInfo(version='2.49b', py_major=2, py_minor=6, bits=64)
+        >>> BlenderAppInfo(version="2.49b", py_version="2.6", bits=64)
+        BlenderAppInfo(version='2.49b', py_version='2.6', bits=64)
         """
-        return ("BlenderAppInfo(version=%s, py_major=%s, py_minor=%s, bits=%s)"
+        return ("BlenderAppInfo(version=%s, py_version=%s, bits=%s)"
                 % (repr(self.version),
-                   repr(self.py_major), repr(self.py_minor), repr(self.bits)))
+                   repr(self.py_version), repr(self.bits)))
 
     def insertmacro_variables(self):
         """Define variables."""
@@ -415,8 +405,8 @@ class BlenderAppInfo(AppInfo):
         in the section definition.
         """
         yield '!macro SECTION_EXTRA_%s' % self.label
-        yield ('    !insertmacro SECTION_EXTRA_BLENDER %s %i %i'
-               % (self.label, self.py_major, self.py_minor))
+        yield ('    !insertmacro SECTION_EXTRA_BLENDER %s %s'
+               % (self.label, self.py_version))
         yield '!macroend'
 
 class bdist_nsi(Command):
@@ -1297,10 +1287,10 @@ SectionEnd
 !macroend
 
 ; setup install vars for python
-!macro SECTION_EXTRA_PYTHON label major minor
+!macro SECTION_EXTRA_PYTHON label py_version
     StrCpy $0 "$PATH_${label}"
     StrCpy $1 "$PATH_${label}\\python.exe"
-    StrCpy $2 "${major}.${minor}"
+    StrCpy $2 "${py_version}"
     StrCpy $3 "$PATH_${label}\\Lib\\site-packages"
     StrCpy $4 "$PATH_${label}\\Scripts"
     StrCpy $5 "$PATH_${label}\\Include"
@@ -1342,10 +1332,10 @@ mayapy_exe_not_found_${label}:
 
 
 ; setup install vars for maya
-!macro SECTION_EXTRA_MAYA label major minor
+!macro SECTION_EXTRA_MAYA label py_version
     StrCpy $0 "$PATH_${label}\\Python"
     StrCpy $1 "$PATH_${label}\\bin\\mayapy.exe"
-    StrCpy $2 "${major}.${minor}"
+    StrCpy $2 "${py_version}"
     StrCpy $3 "$PATH_${label}\\Python\\Lib\\site-packages"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
@@ -1426,10 +1416,10 @@ blender_scripts_not_found:
 blender_scripts_done:
 !macroend
 
-!macro SECTION_EXTRA_BLENDER label major minor
+!macro SECTION_EXTRA_BLENDER label py_version
     StrCpy $0 "" ; XXX todo: set python path
     StrCpy $1 "" ; XXX todo: set python executable
-    StrCpy $2 "${major}.${minor}"
+    StrCpy $2 "${py_version}"
     StrCpy $3 "$SCRIPTS_${label}\\bpymodules"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
