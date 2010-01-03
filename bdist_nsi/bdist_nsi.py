@@ -1703,7 +1703,7 @@ SectionEnd
                 '!insertmacro SECTION "" "%s" %s' % (app.name, app.label)
                 for app in blender_apps)
             + "\nSectionGroupEnd\n\n"
-            + "\nSectionGroup /e un.Python\n"
+            + "\nSectionGroup /e un.Blender\n"
             + "\n".join(
                 '!insertmacro SECTION "un." "%s" %s' % (app.name, app.label)
                 for app in blender_apps)
