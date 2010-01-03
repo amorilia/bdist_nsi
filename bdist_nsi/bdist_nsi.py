@@ -117,9 +117,9 @@ class AppInfo:
         64
         >>> MayaAppInfo(version="2009", py_version="2.5", bits=32).bits
         32
-        >>> BlenderAppInfo(version="2.49b", py_version="2.6", bits=64).bits
+        >>> BlenderAppInfo(version="2.4x", py_version="2.6", bits=64).bits
         64
-        >>> BlenderAppInfo(version="2.49b", py_version="2.6", bits=32).bits
+        >>> BlenderAppInfo(version="2.4x", py_version="2.6", bits=32).bits
         32
         """
         return max(regkey.view for regkey in self.regkeys)
@@ -201,7 +201,7 @@ class AppInfo:
         >>> MayaAppInfo.make_apps(["2.6"])
         [MayaAppInfo(version='2010', py_version='2.6', bits=32), MayaAppInfo(version='2010', py_version='2.6', bits=64)]
         >>> BlenderAppInfo.make_apps(["2.6"])
-        [BlenderAppInfo(version='2.49b', py_version='2.6', bits=32)]
+        [BlenderAppInfo(version='2.4x', py_version='2.6', bits=32)]
         """
         version_bits = list(
             cls.make_version_bits_tuples(versions, bits))
@@ -355,22 +355,26 @@ class MayaAppInfo(AppInfo):
 class BlenderAppInfo(AppInfo):
     r"""Blender application info.
 
-    >>> print("\n".join(BlenderAppInfo(version="2.49b", py_version="2.6", bits=32).macro_get_registry_keys()))
-    !macro GET_REGISTRY_KEYS_blender_2_49b if_found if_not_found
-        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_49b 32 HKLM "SOFTWARE\\BlenderFoundation" "Install_Dir" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_49b 32 HKCU "SOFTWARE\\BlenderFoundation" "Install_Dir" ${if_found} ${if_not_found}
+    >>> print("\n".join(BlenderAppInfo(version="2.4x", py_version="2.6", bits=32).macro_get_registry_keys()))
+    !macro GET_REGISTRY_KEYS_blender_2_4x_2_6_32 if_found if_not_found
+        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_4x_2_6_32 32 HKLM "SOFTWARE\BlenderFoundation" "Install_Dir" ${if_found} 0
+        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_4x_2_6_32 32 HKCU "SOFTWARE\BlenderFoundation" "Install_Dir" ${if_found} ${if_not_found}
     !macroend
     """
 
     VERSIONS = [
-        ("2.49b", "2.6", 32),
+        ("2.4x", "2.4", 32),
+        ("2.4x", "2.5", 32),
+        ("2.4x", "2.6", 32),
         ]
     """All versions of blender, as (version, py_version, bits)."""
 
     def __init__(self, version=None, py_version=None, bits=None):
         self.version = version
-        self.name = "Blender %s (%i bit)" % (version, bits)
-        self.label = "blender_%s" % version.replace(".", "_")
+        self.name = ("Blender %s (Python %s, %i bit)"
+                     % (version, py_version, bits))
+        self.label = (("blender_%s_%s_%i" % (version, py_version, bits))
+                      .replace(".", "_"))
         self.py_version = py_version
         key = r"SOFTWARE\BlenderFoundation"
         name = r"Install_Dir"
@@ -382,8 +386,8 @@ class BlenderAppInfo(AppInfo):
     def __repr__(self):
         """String representation.
 
-        >>> BlenderAppInfo(version="2.49b", py_version="2.6", bits=64)
-        BlenderAppInfo(version='2.49b', py_version='2.6', bits=64)
+        >>> BlenderAppInfo(version="2.4x", py_version="2.6", bits=64)
+        BlenderAppInfo(version='2.4x', py_version='2.6', bits=64)
         """
         return ("BlenderAppInfo(version=%s, py_version=%s, bits=%s)"
                 % (repr(self.version),
@@ -397,7 +401,8 @@ class BlenderAppInfo(AppInfo):
     def macro_get_path_extra_check(self):
         """Returns NSIS script which validates the python path."""
         yield '!macro GET_PATH_EXTRA_CHECK_%s' % self.label
-        yield '    !insertmacro GET_PATH_EXTRA_CHECK_BLENDER %s' % self.label
+        yield ('    !insertmacro GET_PATH_EXTRA_CHECK_BLENDER %s python%s.dll'
+               % (self.label, self.py_version.replace(".", "")))
         yield '!macroend'
 
     def macro_section_extra(self):
@@ -1391,10 +1396,13 @@ mayapy_exe_not_found_${label}:
 !macroend
 
 ; validates path for blender
-!macro GET_PATH_EXTRA_CHECK_BLENDER label
+!macro GET_PATH_EXTRA_CHECK_BLENDER label python_dll
 
     IfFileExists $PATH_${label}\blender.exe 0 blender_exe_not_found_${label}
     !insertmacro DEBUG_MSG "found blender executable at $PATH_${label}\blender.exe"
+
+    IfFileExists $PATH_${label}\${python_dll} 0 python_dll_not_found_${label}
+    !insertmacro DEBUG_MSG "found python dll at $PATH_${label}\${python_dll}"
 
     ; clear variable
     StrCpy $SCRIPTS_${label} ""
@@ -1434,6 +1442,7 @@ blender_scripts_found_${label}:
     GoTo blender_scripts_done_${label}
 
 blender_exe_not_found_${label}:
+python_dll_not_found_${label}:
 blender_scripts_not_found_${label}:
     !insertmacro DEBUG_MSG "blender scripts not found"
     StrCpy $SCRIPTS_${label} ""
