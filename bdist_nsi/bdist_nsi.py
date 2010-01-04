@@ -363,6 +363,7 @@ class BlenderAppInfo(AppInfo):
     """
 
     VERSIONS = [
+        ("2.4x", "2.3", 32),
         ("2.4x", "2.4", 32),
         ("2.4x", "2.5", 32),
         ("2.4x", "2.6", 32),
@@ -401,8 +402,8 @@ class BlenderAppInfo(AppInfo):
     def macro_get_path_extra_check(self):
         """Returns NSIS script which validates the python path."""
         yield '!macro GET_PATH_EXTRA_CHECK_%s' % self.label
-        yield ('    !insertmacro GET_PATH_EXTRA_CHECK_BLENDER %s python%s.dll'
-               % (self.label, self.py_version.replace(".", "")))
+        yield ('    !insertmacro GET_PATH_EXTRA_CHECK_BLENDER %s %s'
+               % (self.label, self.py_version))
         yield '!macroend'
 
     def macro_section_extra(self):
@@ -413,6 +414,29 @@ class BlenderAppInfo(AppInfo):
         yield ('    !insertmacro SECTION_EXTRA_BLENDER %s %s'
                % (self.label, self.py_version))
         yield '!macroend'
+
+    @staticmethod
+    def insertmacro_push_blender_python_version(target_versions):
+        """Push the python version, for use in the
+        CHECK_BLENDER_PYTHON_VERSION macro.
+        """
+        if not target_versions:
+            raise ValueError(
+                "target_versions must contain at least one element")
+        yield '    ; note: if user installs a newer version of Blender over'
+        yield '    ; an older version then two python dll files could co-exist;'
+        yield '    ; therefore, check the higher version numbers first'
+        versions = sorted(target_versions, reverse=True)
+        yield ('    ${If} ${FileExists} "$PATH_${label}\python%s.dll"'
+               % versions[0].replace(".", ""))
+        yield '        Push "%s"' % versions[0]
+        for version in versions[1:]:
+            yield ('    ${ElseIf} ${FileExists} "$PATH_${label}\python%s.dll"'
+                   % version.replace(".", ""))
+            yield '        Push "%s"' % version
+        yield '    ${Else}'
+        yield '        Push ""'
+        yield '    ${EndIf}'
 
 class bdist_nsi(Command):
 
@@ -633,14 +657,14 @@ class bdist_nsi(Command):
     
     def build_nsi(self):
         if self.target_version.upper() not in ["","ANY"]:
-            nsiscript = get_nsi(pythonversions=[self.target_version])
+            nsiscript = get_nsi(target_versions=[self.target_version])
         elif self.target_versions:
-            nsiscript = get_nsi(pythonversions=self.target_versions.split(","))
+            nsiscript = get_nsi(target_versions=self.target_versions.split(","))
         else:
-            pythonversions = ["2.3", "2.4", "2.5", "2.6", "2.7"]
+            target_versions = ["2.3", "2.4", "2.5", "2.6", "2.7"]
             if self.run2to3:
-                pythonversions.extend(["3.0", "3.1", "3.2"])
-            nsiscript = get_nsi(pythonversions=pythonversions)
+                target_versions.extend(["3.0", "3.1", "3.2"])
+            nsiscript = get_nsi(target_versions=target_versions)
         metadata = self.distribution.metadata
 
         def get_full_author(key):
@@ -986,12 +1010,11 @@ class bdist_nsi(Command):
             
 # class bdist_nsi
 
-def get_nsi(pythonversions=None, bits=None):
+def get_nsi(target_versions=None, bits=None):
     # list all applications
-    python_apps = PythonAppInfo.make_apps(pythonversions, bits)
-    maya_apps = MayaAppInfo.make_apps(pythonversions, bits)
-    blender_apps = BlenderAppInfo.make_apps(pythonversions, bits)
-    apps = python_apps + maya_apps + blender_apps
+    python_apps = PythonAppInfo.make_apps(target_versions, bits)
+    maya_apps = MayaAppInfo.make_apps(target_versions, bits)
+    blender_apps = BlenderAppInfo.make_apps(target_versions, bits)
 
     NSI_HEADER = r"""\
 ; @name@ self-installer for Windows
@@ -1395,14 +1418,23 @@ mayapy_exe_not_found_${label}:
     IfFileExists "$SCRIPTS_${label}\*.*" ${if_found} ${if_not_found}
 !macroend
 
-; validates path for blender
-!macro GET_PATH_EXTRA_CHECK_BLENDER label python_dll
+!macro CHECK_BLENDER_PYTHON_VERSION label py_version if_right if_wrong
+    ; dll check for python version
+""" + "\n".join(
+        BlenderAppInfo.insertmacro_push_blender_python_version(
+            target_versions)) + r"""
+    Pop $0
+    StrCmp $0 ${py_version} ${if_right} ${if_wrong}
+!macroend
 
-    IfFileExists $PATH_${label}\blender.exe 0 blender_exe_not_found_${label}
+; validates path for blender
+!macro GET_PATH_EXTRA_CHECK_BLENDER label py_version
+
+    ; check if blender.exe exists
+    IfFileExists "$PATH_${label}\blender.exe" 0 blender_exe_not_found_${label}
     !insertmacro DEBUG_MSG "found blender executable at $PATH_${label}\blender.exe"
 
-    IfFileExists $PATH_${label}\${python_dll} 0 python_dll_not_found_${label}
-    !insertmacro DEBUG_MSG "found python dll at $PATH_${label}\${python_dll}"
+    !insertmacro CHECK_BLENDER_PYTHON_VERSION ${label} ${py_version} 0 wrong_python_version_${label}
 
     ; clear variable
     StrCpy $SCRIPTS_${label} ""
@@ -1442,7 +1474,7 @@ blender_scripts_found_${label}:
     GoTo blender_scripts_done_${label}
 
 blender_exe_not_found_${label}:
-python_dll_not_found_${label}:
+wrong_python_version_${label}:
 blender_scripts_not_found_${label}:
     !insertmacro DEBUG_MSG "blender scripts not found"
     StrCpy $SCRIPTS_${label} ""
