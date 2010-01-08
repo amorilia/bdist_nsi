@@ -1323,6 +1323,9 @@ python_exe_not_found_${label}:
 !endif
 
 !macro SECTION un name label
+!ifndef HAVE_SECTION_${label}
+!define HAVE_SECTION_${label}
+!endif
 Section "${un}${name}" ${un}section_${label}
     SetShellVarContext all
     StrCmp $PATH_${label} "" section_end_${label}
