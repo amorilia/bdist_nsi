@@ -127,8 +127,7 @@ class AppInfo:
     def macro_get_registry_keys(self):
         r"""Returns NSIS script which defines a macro which jumps to
         if_found if the registry key is found in any of the listed
-        registry keys, storing the result in $PATH_${label}, and jumps to
-        if_not_found otherwise.
+        registry keys, storing the result in $PATH_${label}.
 
         >>> regkey1 = RegKey(view=32, root="HKLM",
         ...                  key=r"Software\BlenderFoundation",
@@ -143,22 +142,19 @@ class AppInfo:
         ...               regkeys=[regkey1, regkey2, regkey3],
         ...               py_version='3.2')
         >>> print("\n".join(app.macro_get_registry_keys()))
-        !macro GET_REGISTRY_KEYS_test if_found if_not_found
-            !insertmacro GET_REGISTRY_KEY $PATH_test 32 HKLM "Software\BlenderFoundation" "Install_Dir" ${if_found} 0
-            !insertmacro GET_REGISTRY_KEY $PATH_test 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-            !insertmacro GET_REGISTRY_KEY $PATH_test 32 HKCR "NSIS.Header" "DefaultIcon" ${if_found} ${if_not_found}
+        !macro GET_REGISTRY_KEYS_test if_found
+            !insertmacro GET_REGISTRY_KEY $PATH_test 32 HKLM "Software\BlenderFoundation" "Install_Dir" ${if_found}
+            !insertmacro GET_REGISTRY_KEY $PATH_test 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
+            !insertmacro GET_REGISTRY_KEY $PATH_test 32 HKCR "NSIS.Header" "DefaultIcon" ${if_found}
         !macroend
         """
-        yield "!macro GET_REGISTRY_KEYS_%s if_found if_not_found" % self.label
-        not_found_labels = (
-            ["0"] * (len(self.regkeys) - 1) + ["${if_not_found}"])
-        for regkey, not_found_label in zip(self.regkeys, not_found_labels):
+        yield "!macro GET_REGISTRY_KEYS_%s if_found" % self.label
+        for regkey in self.regkeys:
             yield (
                 '    !insertmacro GET_REGISTRY_KEY $PATH_%s %s %s "%s" "%s"'
-                ' ${if_found} %s'
+                ' ${if_found}'
                 % (self.label,
-                   regkey.view, regkey.root, regkey.key, regkey.name,
-                   not_found_label))
+                   regkey.view, regkey.root, regkey.key, regkey.name))
         yield "!macroend"
 
     def macro_get_path_extra_check(self):
@@ -213,9 +209,9 @@ class PythonAppInfo(AppInfo):
     r"""Python application info.
 
     >>> print("\n".join(PythonAppInfo(version="2.5", bits=32).macro_get_registry_keys()))
-    !macro GET_REGISTRY_KEYS_python_2_5_32 if_found if_not_found
-        !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKLM "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKCU "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found} ${if_not_found}
+    !macro GET_REGISTRY_KEYS_python_2_5_32 if_found
+        !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKLM "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_python_2_5_32 32 HKCU "SOFTWARE\Python\PythonCore\2.5\InstallPath" "" ${if_found}
     !macroend
     """
 
@@ -278,18 +274,18 @@ class MayaAppInfo(AppInfo):
     r"""Maya application info.
 
     >>> print("\n".join(MayaAppInfo(version=2008, py_version="2.5", bits=32).macro_get_registry_keys()))
-    !macro GET_REGISTRY_KEYS_maya_2008_32 if_found if_not_found
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKLM "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} ${if_not_found}
+    !macro GET_REGISTRY_KEYS_maya_2008_32 if_found
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKLM "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_32 32 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
     !macroend
     >>> print("\n".join(MayaAppInfo(version=2008, py_version="2.5", bits=64).macro_get_registry_keys()))
-    !macro GET_REGISTRY_KEYS_maya_2008_64 if_found if_not_found
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKLM "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKCU "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKLM "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKCU "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKLM "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found} ${if_not_found}
+    !macro GET_REGISTRY_KEYS_maya_2008_64 if_found
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKLM "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 32 HKCU "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKLM "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKCU "SOFTWARE\Autodesk\Maya\2008-x64\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKLM "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_maya_2008_64 64 HKCU "SOFTWARE\Autodesk\Maya\2008\Setup\InstallPath" "MAYA_INSTALL_LOCATION" ${if_found}
     !macroend
     """
 
@@ -356,9 +352,9 @@ class BlenderAppInfo(AppInfo):
     r"""Blender application info.
 
     >>> print("\n".join(BlenderAppInfo(version="2.4x", py_version="2.6", bits=32).macro_get_registry_keys()))
-    !macro GET_REGISTRY_KEYS_blender_2_4x_2_6_32 if_found if_not_found
-        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_4x_2_6_32 32 HKLM "SOFTWARE\BlenderFoundation" "Install_Dir" ${if_found} 0
-        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_4x_2_6_32 32 HKCU "SOFTWARE\BlenderFoundation" "Install_Dir" ${if_found} ${if_not_found}
+    !macro GET_REGISTRY_KEYS_blender_2_4x_2_6_32 if_found
+        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_4x_2_6_32 32 HKLM "SOFTWARE\BlenderFoundation" "Install_Dir" ${if_found}
+        !insertmacro GET_REGISTRY_KEY $PATH_blender_2_4x_2_6_32 32 HKCU "SOFTWARE\BlenderFoundation" "Install_Dir" ${if_found}
     !macroend
     """
 
@@ -1250,11 +1246,11 @@ FunctionEnd
 !macroend
 
 ; jumps to registry_key_found if the registry key is found
-!macro GET_REGISTRY_KEY variable reg_view reg_root reg_key reg_name if_found if_not_found
+!macro GET_REGISTRY_KEY variable reg_view reg_root reg_key reg_name if_found
     !insertmacro DEBUG_MSG "looking for ${reg_root}\${reg_key}\${reg_name} in ${reg_view} bit registry"
     SetRegView ${reg_view}
     ReadRegStr ${variable} ${reg_root} ${reg_key} "${reg_name}"
-    IfErrors ${if_not_found} ${if_found}
+    IfErrors 0 ${if_found}
 !macroend
 
 """ + "\n".join(
@@ -1276,7 +1272,7 @@ FunctionEnd
 
     ; check registry
     ClearErrors
-    !insertmacro GET_REGISTRY_KEYS_${label} registry_key_found_${label} 0
+    !insertmacro GET_REGISTRY_KEYS_${label} registry_key_found_${label}
     StrCpy $PATH_${label} ""
     !insertmacro DEBUG_MSG "not found in registry"
     Goto get_path_end_${label}
