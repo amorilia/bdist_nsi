@@ -1641,7 +1641,7 @@ Function .onInit
   ; Language selection.
   !insertmacro MUI_LANGDLL_DISPLAY
 
-!ifdef DEBUG
+!ifdef MISC_DEBUG
      ${If} ${RunningX64}
          MessageBox MB_OK "running on x64"
      ${EndIf}
