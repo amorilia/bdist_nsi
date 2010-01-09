@@ -1641,6 +1641,12 @@ Function .onInit
   ; Language selection.
   !insertmacro MUI_LANGDLL_DISPLAY
 
+!ifdef DEBUG
+     ${If} ${RunningX64}
+         MessageBox MB_OK "running on x64"
+     ${EndIf}
+!endif
+
   ; check python versions
 """ + "\n".join(
     "    !insertmacro SECTION_SET_PROPERTIES %s"
