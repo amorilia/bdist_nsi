@@ -1068,7 +1068,7 @@ ShowUnInstDetails show
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
-
+!include "x64.nsh"
 
 
 ; MUI Settings
@@ -1248,9 +1248,16 @@ FunctionEnd
 ; jumps to registry_key_found if the registry key is found
 !macro GET_REGISTRY_KEY variable reg_view reg_root reg_key reg_name if_found
     !insertmacro DEBUG_MSG "looking for ${reg_root}\${reg_key}\${reg_name} in ${reg_view} bit registry"
+!if "${reg_view}" == "64"
+    ; only check 64 bit registry keys on 64 bit systems
+    ${If} ${RunningX64}
+!endif
     SetRegView ${reg_view}
     ReadRegStr ${variable} ${reg_root} ${reg_key} "${reg_name}"
     IfErrors 0 ${if_found}
+!if "${reg_view}" == "64"
+    ${EndIf}
+!endif
 !macroend
 
 """ + "\n".join(
