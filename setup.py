@@ -8,8 +8,8 @@ License :: OSI Approved :: BSD License
 Natural Language :: English
 Operating System :: OS Independent
 Programming Language :: Python
-Topic :: Software Distribution
-Topic :: Code Generators"""
+Topic :: System :: Software Distribution
+Topic :: Software Development :: Code Generators"""
 
 from distutils.core import setup
 import os
