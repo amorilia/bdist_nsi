@@ -13,6 +13,9 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 #   - added AppInfo classes for better implementation
 #   - added proper 64 bit support
 
+# April 2010 (Amorilia):
+#   - added support for native Python 3 packages (without 2to3)
+
 import sys, os, string
 import subprocess
 from distutils.core import Command
@@ -655,10 +658,17 @@ class bdist_nsi(Command):
             nsiscript = get_nsi(target_versions=[self.target_version])
         elif self.target_versions:
             nsiscript = get_nsi(target_versions=self.target_versions.split(","))
-        else:
+        elif sys.version_info[0] < 3:
+            # python 2.x
             target_versions = ["2.3", "2.4", "2.5", "2.6", "2.7"]
             if self.run2to3:
                 target_versions.extend(["3.0", "3.1", "3.2"])
+            nsiscript = get_nsi(target_versions=target_versions)
+        else:
+            # python 3.x
+            target_versions = ["3.0", "3.1", "3.2"]
+            # disable 2to3
+            self.run2to3 = 0
             nsiscript = get_nsi(target_versions=target_versions)
         metadata = self.distribution.metadata
 
