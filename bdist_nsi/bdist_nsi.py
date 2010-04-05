@@ -741,8 +741,9 @@ class bdist_nsi(Command):
         nsiscript=nsiscript.replace('@haspythonversion@',haspythonversion)
         
         files=[]
-        
-        os.walk(self.bdist_dir+os.sep+'_python',self.visit,files)
+
+        for dirpath, dirnames, filenames in os.walk(self.bdist_dir+os.sep+'_python'):
+            self.visit(files, dirpath, filenames)
 
         # install folders and files (as nsis commands)
         _f_packages=[]
