@@ -29,6 +29,6 @@ setup(
     url = 'http://bdist-nsi.sourceforge.net/',
     license = 'BSD',
     platforms = ["any"],
-    classifiers = filter(None, classifiers.split("\n")),
+    classifiers = [_f for _f in classifiers.split("\n") if _f],
     long_description = long_description
 )

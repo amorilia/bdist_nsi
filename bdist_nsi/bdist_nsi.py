@@ -536,9 +536,8 @@ class bdist_nsi(Command):
         if not self.skip_build and self.distribution.has_ext_modules():
             short_version = get_python_version()
             if self.target_version and self.target_version != short_version:
-                raise DistutilsOptionError, \
-                      "target version can only be %s, or the '--skip_build'" \
-                      " option must be specified" % (short_version,)
+                raise DistutilsOptionError("target version can only be %s, or the '--skip_build'" \
+                      " option must be specified" % (short_version,))
             self.target_version = short_version
 
         # find makensis executable
@@ -733,7 +732,7 @@ class bdist_nsi(Command):
         
         files=[]
         
-        os.path.walk(self.bdist_dir+os.sep+'_python',self.visit,files)
+        os.walk(self.bdist_dir+os.sep+'_python',self.visit,files)
 
         # install folders and files (as nsis commands)
         _f_packages=[]
