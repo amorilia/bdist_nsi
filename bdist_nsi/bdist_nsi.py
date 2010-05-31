@@ -299,6 +299,8 @@ class MayaAppInfo(AppInfo):
         ("2009", "2.5", 64),
         ("2010", "2.6", 32),
         ("2010", "2.6", 64),
+        ("2011", "2.6", 32),
+        ("2011", "2.6", 64),
         ]
     """All versions of maya, as (version, py_version, bits)."""
     
