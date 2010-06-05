@@ -2,7 +2,7 @@
 
 """Setup script for bdist_nsi."""
 
-classifiers = """Development Status :: 4 - Beta
+classifiers = """Development Status :: 5 - Production/Stable
 Intended Audience :: Developers
 License :: OSI Approved :: BSD License
 Natural Language :: English
