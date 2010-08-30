@@ -29,9 +29,22 @@ To install from source, simply run::
 Usage
 -----
 
-Create your installer with::
+Add ``bdist_nsi`` option to your setup.py file.
 
-    python setup.py --command-packages bdist_nsi bdist_nsi
+In your projects setup.py::
+
+    from bdist_nsi import bdist_nsi
+
+    nsis_options = {} # your nsis options
+    setup(
+        name='your application name', 
+        version='0.0.x',
+        author='your name',
+        author_email='your email',
+        url='http://yourdomain.com/',
+        license='your license',) # your setup options
+
+You can create installer ``python setup.py bdist_nsi`` command.
 
 If the makensis executable is not installed in one of the usual
 locations (``/usr/bin``, ``C:\Program Files\NSIS``, or

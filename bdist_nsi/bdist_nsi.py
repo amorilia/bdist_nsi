@@ -16,6 +16,9 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 # April 2010 (Amorilia):
 #   - added support for native Python 3 packages (without 2to3)
 
+# August 2010 (Surgo)
+#   - added distutils commandoption
+
 import sys, os, string
 import subprocess
 from distutils.core import Command
@@ -26,6 +29,10 @@ from distutils.sysconfig import get_python_version
 from distutils import log
 from distutils.spawn import spawn
 from distutils.command.install import WINDOWS_SCHEME
+
+from distutils import command
+command.__all__.append('bdist_nsi')
+sys.modules['distutils.command.bdist_nsi'] = sys.modules[__name__]
 
 class RegKey:
     """Stores the location of a registry key."""
