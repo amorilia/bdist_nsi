@@ -33,7 +33,10 @@ Add ``bdist_nsi`` option to your setup.py file.
 
 In your projects setup.py::
 
-    from bdist_nsi import bdist_nsi
+    try:
+        import bdist_nsi
+    except ImportError:
+        pass
 
     nsis_options = {} # your nsis options
     setup(
@@ -42,6 +45,7 @@ In your projects setup.py::
         author='your name',
         author_email='your email',
         url='http://yourdomain.com/',
+        options={'bdist_nsi': nsis_options, }, 
         license='your license',) # your setup options
 
 You can create installer ``python setup.py bdist_nsi`` command.
