@@ -17,7 +17,7 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 #   - added support for native Python 3 packages (without 2to3)
 
 # August 2010 (Surgo)
-#   - added distutils commandoption
+#   - added distutils command option
 
 import sys, os, string
 import subprocess
