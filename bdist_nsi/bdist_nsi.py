@@ -398,8 +398,8 @@ class BlenderAppInfo(AppInfo):
         >>> BlenderAppInfo(version="2.4x", py_version="2.6", bits=64)
         BlenderAppInfo(version='2.4x', py_version='2.6', bits=64)
         """
-        return ("BlenderAppInfo(version=%s, py_version=%s, bits=%s)"
-                % (repr(self.version),
+        return ("%s(version=%s, py_version=%s, bits=%s)"
+                % (self.__class__.__name__, repr(self.version),
                    repr(self.py_version), repr(self.bits)))
 
     def insertmacro_variables(self):
@@ -445,6 +445,34 @@ class BlenderAppInfo(AppInfo):
         yield '    ${Else}'
         yield '        Push ""'
         yield '    ${EndIf}'
+
+# blender versions from 25x onwards embed python
+class Blender25xAppInfo(BlenderAppInfo):
+    VERSIONS = [
+        ("2.59", "3.2", 32),
+        ("2.59", "3.2", 64),
+        ]
+    """All versions of blender, as (version, py_version, bits)."""
+
+    def insertmacro_variables(self):
+        """Define variables."""
+        return AppInfo.insertmacro_variables(self) # only PATH_${label}
+
+    def macro_get_path_extra_check(self):
+        """Returns NSIS script which validates the python path."""
+        yield '!macro GET_PATH_EXTRA_CHECK_%s' % self.label
+        yield ('    !insertmacro GET_PATH_EXTRA_CHECK_BLENDER_25X %s %s %s'
+               % (self.label, self.py_version, self.version))
+        yield '!macroend'
+
+    def macro_section_extra(self):
+        """Returns NSIS script which sets up the installation variables
+        in the section definition.
+        """
+        yield '!macro SECTION_EXTRA_%s' % self.label
+        yield ('    !insertmacro SECTION_EXTRA_BLENDER_25X %s %s %s'
+               % (self.label, self.py_version, self.version))
+        yield '!macroend'
 
 class bdist_nsi(Command):
 
@@ -1029,7 +1057,10 @@ def get_nsi(target_versions=None, bits=None):
     # list all applications
     python_apps = PythonAppInfo.make_apps(target_versions, bits)
     maya_apps = MayaAppInfo.make_apps(target_versions, bits)
-    blender_apps = BlenderAppInfo.make_apps(target_versions, bits)
+    blender_apps = (
+        BlenderAppInfo.make_apps(target_versions, bits)
+        + Blender25xAppInfo.make_apps(target_versions, bits)
+        )
 
     NSI_HEADER = r"""\
 ; @name@ self-installer for Windows
@@ -1421,6 +1452,8 @@ mayapy_exe_not_found_${label}:
 
 !ifdef MISC_BLENDER
 
+; Blender 24x
+
 !macro CLEAN_STRAY_BLENDER_USER_DATA_FILES path
     !insertmacro DEBUG_MSG "checking for stray Blender user data files in ${path}"
     IfFileExists "${path}" 0 +3
@@ -1513,6 +1546,30 @@ blender_scripts_done_${label}:
     StrCpy $1 "" ; XXX todo: set python executable
     StrCpy $2 "${py_version}"
     StrCpy $3 "$SCRIPTS_${label}\bpymodules"
+    StrCpy $4 "" ; no scripts
+    StrCpy $5 "" ; no headers
+!macroend
+
+
+
+; Blender 25x+
+
+!macro GET_PATH_EXTRA_CHECK_BLENDER_25X label py_version version
+    IfFileExists $PATH_${label}\${version}\python\lib\*.* 0 python_lib_not_found_${label}
+    !insertmacro DEBUG_MSG "found python libraries at $PATH_${label}\${version}\python\lib"
+    GoTo get_path_end_${label}
+
+python_lib_not_found_${label}:
+
+    !insertmacro DEBUG_MSG "python libraries not found"
+    StrCpy $PATH_${label} ""
+!macroend
+
+!macro SECTION_EXTRA_BLENDER_25X label py_version version
+    StrCpy $0 "$PATH_${label}\${version}\python"
+    StrCpy $1 "" ; no interpreter
+    StrCpy $2 "${py_version}"
+    StrCpy $3 "$PATH_${label}\${version}\python\lib\site-packages"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
 !macroend
