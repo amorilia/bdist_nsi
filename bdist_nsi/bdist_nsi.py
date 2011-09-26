@@ -21,6 +21,7 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 
 # September 2011 (Amorilia)
 #   - added support for Blender 2.5x
+#   - added productkey option
 
 import sys, os, string
 import subprocess
@@ -531,6 +532,12 @@ class bdist_nsi(Command):
                      "include (compatible) Blender targets in installer"),
                     ('debug', None,
                      "debug mode (only use if you know what you are doing)"),
+                    ('productkey=', None,
+                     "product key"
+                     " used for install registry key"
+                     " and install folder; useful for allowing"
+                     " different versions"
+                     " of the same package installed simultaneously"),
                     ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
@@ -560,6 +567,7 @@ class bdist_nsi(Command):
         self.maya = 0
         self.blender = 0
         self.debug = 0
+        self.productkey = None
 
     # initialize_options()
 
@@ -1018,6 +1026,11 @@ class bdist_nsi(Command):
 
         nsiscript = nsiscript.replace("@srcdir@", self.abspath(os.getcwd()))
 
+        if not self.productkey:
+            nsiscript = nsiscript.replace('@key@', '')
+        else:
+            nsiscript = nsiscript.replace('@key@', '-' + self.productkey)
+
         # icon files
         # XXX todo: make icons configurable
         nsiscript = nsiscript.replace(
@@ -1076,10 +1089,11 @@ def get_nsi(target_versions=None, bits=None):
 ; =====================================
 
 !define PRODUCT_NAME "@name@"
+!define PRODUCT_KEY "@key@"
 !define PRODUCT_VERSION "@version@"
 !define PRODUCT_PUBLISHER "@author@ <@author_email@>"
 !define PRODUCT_WEB_SITE "@url@"
-!define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
+!define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}${PRODUCT_KEY}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 !define PRODUCT_UNINST_REG_VIEW 32
 !define MISC_SRCDIR "@srcdir@"
@@ -1110,7 +1124,7 @@ SetCompressor /SOLID lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "@installer_path@"
-InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
+InstallDir "$PROGRAMFILES\${PRODUCT_NAME}${PRODUCT_KEY}"
 ShowInstDetails show
 ShowUnInstDetails show
 
