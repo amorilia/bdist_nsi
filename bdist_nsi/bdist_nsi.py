@@ -19,6 +19,9 @@ Implements the Distutils 'bdist_nsi' command: create a Windows NSIS installer.
 # August 2010 (Surgo)
 #   - added distutils command option
 
+# September 2011 (Amorilia)
+#   - added support for Blender 2.5x
+
 import sys, os, string
 import subprocess
 from distutils.core import Command
