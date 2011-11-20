@@ -455,6 +455,8 @@ class Blender25xAppInfo(BlenderAppInfo):
     VERSIONS = [
         ("2.59", "3.2", 32),
         ("2.59", "3.2", 64),
+        ("2.60", "3.2", 32),
+        ("2.60", "3.2", 64),
         ]
     """All versions of blender, as (version, py_version, bits)."""
 
