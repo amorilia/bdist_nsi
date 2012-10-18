@@ -1659,19 +1659,19 @@ FunctionEnd
 
 
 !ifdef MISC_MSVC2005
-!insertmacro SearchDLL "MSVC2005" "Microsoft Visual C++ 2005 Redistributable Package" "MSVCR80.DLL" "8.0.50727.42" "http://www.microsoft.com/downloads/details.aspx?familyid=32bc1bee-a3f9-4c13-9c99-220b62a191ee&displaylang=en"
+!insertmacro SearchDLL "MSVC2005" "Microsoft Visual C++ 2005 Redistributable Package" "MSVCR80.DLL" "8.0.50727.42" "http://www.microsoft.com/en-us/download/details.aspx?id=3387"
 !endif
 
 !ifdef MISC_MSVC2005SP1
-!insertmacro SearchDLL "MSVC2005SP1" "Microsoft Visual C++ 2005 SP1 Redistributable Package" "MSVCR80.DLL" "8.0.50727.762" "http://www.microsoft.com/downloads/details.aspx?familyid=200b2fd9-ae1a-4a14-984d-389c36f85647&displaylang=en"
+!insertmacro SearchDLL "MSVC2005SP1" "Microsoft Visual C++ 2005 SP1 Redistributable Package" "MSVCR80.DLL" "8.0.50727.762" "http://www.microsoft.com/en-us/download/details.aspx?id=5638"
 !endif
 
 !ifdef MISC_MSVC2008
-!insertmacro SearchDLL "MSVC2008" "Microsoft Visual C++ 2008 Redistributable Package" "MSVCR90.DLL" "9.0.21022.8" "http://www.microsoft.com/downloads/details.aspx?FamilyID=9b2da534-3e03-4391-8a4d-074b9f2bc1bf&DisplayLang=en"
+!insertmacro SearchDLL "MSVC2008" "Microsoft Visual C++ 2008 Redistributable Package" "MSVCR90.DLL" "9.0.21022.8" "http://www.microsoft.com/en-us/download/details.aspx?id=29"
 !endif
 
 !ifdef MISC_MSVC2008SP1
-!insertmacro SearchDLL "MSVC2008SP1" "Microsoft Visual C++ 2008 SP1 Redistributable Package" "MSVCR90.DLL" "9.0.30729.1" "http://www.microsoft.com/downloads/details.aspx?familyid=A5C84275-3B97-4AB7-A40D-3802B2AF5FC2&displaylang=en"
+!insertmacro SearchDLL "MSVC2008SP1" "Microsoft Visual C++ 2008 SP1 Redistributable Package" "MSVCR90.DLL" "9.0.30729.1" "http://www.microsoft.com/en-us/download/details.aspx?id=5582"
 !endif
 """
 
