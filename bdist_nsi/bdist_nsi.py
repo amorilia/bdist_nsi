@@ -1596,7 +1596,10 @@ python_lib_not_found_${label}:
     StrCpy $0 "$PATH_${label}\${version}\python"
     StrCpy $1 "" ; no interpreter
     StrCpy $2 "${py_version}"
-    StrCpy $3 "$PATH_${label}\${version}\python\lib\site-packages"
+    # Blender does not have site-packages on its sys.path
+    #StrCpy $3 "$PATH_${label}\${version}\python\lib\site-packages"
+    # instead, we use scripts\addons\modules
+    StrCpy $3 "$PATH_${label}\${version}\scripts\addons\modules"
     StrCpy $4 "" ; no scripts
     StrCpy $5 "" ; no headers
 !macroend
