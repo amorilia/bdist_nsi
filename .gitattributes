@@ -1,0 +1,13 @@
+*.bat eol=crlf
+*.ini eol=crlf
+*.sh  eol=lf
+*.py  text
+*.rst text
+*.in  text
+*.svg text
+*.bmp binary
+*.ico binary
+
+.gitattributes text
+.gitignore     text
+
