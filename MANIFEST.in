@@ -1,3 +1,5 @@
+include README.rst
+include LICENSE.rst
 include bdist_nsi/python-install.ico
 include bdist_nsi/python-uninstall.ico
 include bdist_nsi/python-install-150x57.bmp
