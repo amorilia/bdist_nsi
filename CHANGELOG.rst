@@ -1,6 +1,8 @@
 Version 0.1.6 (in development)
 ==============================
 
+* Support Python 3.3 and 3.4.
+
 Version 0.1.5 (27 Oct 2012)
 ===========================
 

@@ -720,11 +720,11 @@ class bdist_nsi(Command):
             # python 2.x
             target_versions = ["2.3", "2.4", "2.5", "2.6", "2.7"]
             if self.run2to3:
-                target_versions.extend(["3.0", "3.1", "3.2"])
+                target_versions.extend(["3.0", "3.1", "3.2", "3.3", "3.4"])
             nsiscript = get_nsi(target_versions=target_versions)
         else:
             # python 3.x
-            target_versions = ["3.0", "3.1", "3.2"]
+            target_versions = ["3.0", "3.1", "3.2", "3.3", "3.4"]
             # disable 2to3
             self.run2to3 = 0
             nsiscript = get_nsi(target_versions=target_versions)
